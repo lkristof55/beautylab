@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./prisma/dev.db"
+}
+
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  inviteCode    String?
+  appointments  Appointment[]
+  createdAt     DateTime @default(now())
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  date        DateTime
+  service     String
+  user        User?    @relation(fields: [userId], references: [id])
+  userId      String?
+  createdAt   DateTime @default(now())
+}
+
+model InviteCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  createdBy   String
+  usedBy      String?   // promjena: više nije lista
+  createdAt   DateTime @default(now())
+}
+
