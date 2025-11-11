@@ -30,7 +30,9 @@ export default function LoginPage() {
                 // ✅ Spremi usera i token u context (AuthContext)
                 login(data.user, data.token);
                 setMessage("✅ Prijava uspješna!");
-                setTimeout(() => router.push("/profile"), 1000);
+
+                // 🔥 FIX: Redirect na /dashboard umjesto /profile
+                setTimeout(() => router.push("/dashboard"), 1000);
             } else {
                 setMessage(`❌ ${data.error || "Greška pri prijavi"}`);
             }
@@ -43,50 +45,69 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-porcelain">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-porcelain via-blush to-porcelain">
             <form
                 onSubmit={handleSubmit}
-                className="bg-white shadow-md rounded-2xl p-6 w-80"
+                className="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-8 w-96 border border-beige"
             >
-                <h2 className="text-xl font-bold mb-4 text-center">Prijava</h2>
+                <h2 className="text-3xl font-heading font-bold mb-6 text-center text-graphite">
+                    Dobrodošla natrag 💅
+                </h2>
 
-                <input
-                    type="email"
-                    name="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="border rounded w-full p-2 mb-3"
-                    required
-                />
+                <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2 text-graphite">
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        name="email"
+                        placeholder="irena@beautylab.hr"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="border border-beige rounded-lg w-full p-3 focus:outline-none focus:ring-2 focus:ring-gold transition"
+                        required
+                    />
+                </div>
 
-                <input
-                    type="password"
-                    name="password"
-                    placeholder="Lozinka"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="border rounded w-full p-2 mb-3"
-                    required
-                />
+                <div className="mb-6">
+                    <label className="block text-sm font-medium mb-2 text-graphite">
+                        Lozinka
+                    </label>
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="border border-beige rounded-lg w-full p-3 focus:outline-none focus:ring-2 focus:ring-gold transition"
+                        required
+                    />
+                </div>
 
                 <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gold text-white rounded p-2 hover:bg-amber-600 transition"
+                    className="w-full bg-gold text-white rounded-lg p-3 font-semibold hover:brightness-95 transition disabled:opacity-60"
                 >
                     {loading ? "Prijava..." : "Prijavi se"}
                 </button>
 
                 {message && (
                     <p
-                        className={`mt-3 text-center text-sm ${
-                            message.includes("❌") ? "text-red-500" : "text-green-600"
+                        className={`mt-4 text-center text-sm font-medium ${
+                            message.includes("❌") ? "text-red-600" : "text-green-600"
                         }`}
                     >
                         {message}
                     </p>
                 )}
+
+                <p className="mt-6 text-center text-sm text-gray-600">
+                    Nemaš račun?{" "}
+                    <a href="/register" className="text-gold hover:underline font-medium">
+                        Registriraj se
+                    </a>
+                </p>
             </form>
         </div>
     );

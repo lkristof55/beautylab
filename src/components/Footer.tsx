@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import "../app/globals.css";
@@ -58,7 +58,7 @@ export default function Footer() {
                         <h4 className="footer__info-title">Quick Links</h4>
                         <ul className="footer__info-list">
                             <li><a href="/">Home</a></li>
-                            <li><a href="/rezerviraj">Book Appointment</a></li>
+                            <li><a href="/appointments">Book Appointment</a></li>
                             <li><a href="/radovi">Our Work</a></li>
                             <li><a href="/about">About Us</a></li>
                         </ul>

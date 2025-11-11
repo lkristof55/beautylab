@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 
@@ -125,7 +125,7 @@ export default function BookingSection() {
                             Mention allergies or sensitivities for a flawless experience.
                         </p>
                     </div>
-                    <a href="/rezerviraj">
+                    <a href="/appointments">
                         <div
                             aria-label="Start booking — three clicks"
                             className="btn booking-cta btn-primary"

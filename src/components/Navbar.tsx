@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -162,7 +162,7 @@ export default function Navbar() {
                                             <p className="profile-name">{user.name}</p>
                                             <p className="profile-email">{user.email}</p>
                                         </div>
-                                        <a href="/profile" className="profile-item">
+                                        <a href="/dashboard" className="profile-item">
                                             Profil
                                         </a>
                                         <a href="/appointments" className="profile-item">
