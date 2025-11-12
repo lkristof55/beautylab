@@ -1,347 +1,372 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import "../dashboard-styles.css"; // Import luxury styles
+import React, { useState } from "react";
+import Script from "dangerous-html/react";
+import { Helmet } from "react-helmet";
 
-type Appointment = {
-    id: string;
-    service: string;
-    date: string;
-    status?: "BOOKED" | "CANCELLED" | "DONE";
-};
+import Navbar from "../../components/Navbar";
+import Footer from "../../components/Footer";
+import "./dashboard-styles.css";
 
-export default function LuxuryDashboardPage() {
-    const [loading, setLoading] = useState(true);
-    const [me, setMe] = useState<{ name: string; email: string; createdAt: string } | null>(null);
-    const [appts, setAppts] = useState<Appointment[]>([]);
-    const router = useRouter();
+const UserDashboard = (props) => {
+    const [activeTab, setActiveTab] = useState("appointments");
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-    useEffect(() => {
-        if (!token) {
-            router.replace("/login");
-            return;
-        }
-
-        const run = async () => {
-            try {
-                const [r1, r2] = await Promise.all([
-                    fetch("/api/profile", { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch("/api/appointments", { headers: { Authorization: `Bearer ${token}` } }),
-                ]);
-
-                if (!r1.ok) throw new Error("Greška profila");
-                const { user } = await r1.json();
-                setMe(user);
-
-                if (r2.ok) {
-                    const data = await r2.json();
-                    setAppts(data.appointments || []);
-                } else {
-                    setAppts([]);
-                }
-            } catch (e) {
-                console.error(e);
-                localStorage.removeItem("token");
-                router.replace("/login");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        run();
-    }, [router, token]);
-
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        router.replace("/login");
+    const handleTabClick = (tabId) => {
+        setActiveTab(tabId);
     };
-
-    const handleCancel = async (id: string) => {
-        if (!token) return;
-        const sure = confirm("Želiš otkazati ovaj termin?");
-        if (!sure) return;
-
-        const res = await fetch("/api/appointments", {
-            method: "DELETE",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ appointmentId: id }),
-        });
-
-        if (res.ok) {
-            setAppts((prev) => prev.filter((a) => a.id !== id));
-        } else {
-            const data = await res.json();
-            alert(data.error || "Greška pri otkazivanju");
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen" style={{ background: 'linear-gradient(135deg, #fdfbf7 0%, #f7f3ef 100%)' }}>
-                <div className="loading-spinner"></div>
-            </div>
-        );
-    }
-
-    if (!me) return null;
-
-    const upcomingAppts = appts.filter(a => new Date(a.date) > new Date() && a.status !== "CANCELLED");
-    const pastAppts = appts.filter(a => new Date(a.date) <= new Date() || a.status === "CANCELLED");
-    const nextAppointment = upcomingAppts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
     return (
-        <div id="user-dashboard">
-            <section className="appointments-section">
-                <div className="appointments-container">
-                    {/* Header */}
-                    <header className="section-header" style={{ marginBottom: '2rem' }}>
-                        <h1 className="section-title">
-                            Dobrodošla, <span style={{ color: '#d4af37' }}>{me.name}</span> 💅
-                        </h1>
-                        <p className="section-subtitle">
-                            {me.email} • Član od {new Date(me.createdAt).toLocaleDateString("hr-HR")}
-                        </p>
-                    </header>
+        <div className="user-dashboard-container">
+            <Helmet>
+                <title>User Dashboard - Beauty Lab</title>
+                <meta property="og:title" content="User Dashboard - Beauty Lab" />
+            </Helmet>
 
-                    {/* Quick Actions */}
-                    <div style={{ maxWidth: '1200px', margin: '0 auto 3rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <Navbar />
+
+            <main className="user-dashboard-main">
+                <div className="dashboard-container">
+                    {/* Tab Navigation */}
+                    <div className="tab-navigation">
                         <button
-                            onClick={() => router.push("/appointments")}
-                            className="btn btn-primary"
+                            className={`tab-button ${
+                                activeTab === "appointments" ? "active" : ""
+                            }`}
+                            onClick={() => handleTabClick("appointments")}
+                            aria-selected={activeTab === "appointments"}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" />
-                                <path d="M3 10h18M8 2v4m8-4v4" />
-                            </svg>
-                            <span>Nova Rezervacija</span>
+                            My Appointments
                         </button>
-                        <button onClick={handleLogout} className="btn btn-outline">
-                            Odjavi se
+                        <button
+                            className={`tab-button ${
+                                activeTab === "loyalty" ? "active" : ""
+                            }`}
+                            onClick={() => handleTabClick("loyalty")}
+                            aria-selected={activeTab === "loyalty"}
+                        >
+                            Loyalty & Coupons
+                        </button>
+                        <button
+                            className={`tab-button ${
+                                activeTab === "invite" ? "active" : ""
+                            }`}
+                            onClick={() => handleTabClick("invite")}
+                            aria-selected={activeTab === "invite"}
+                        >
+                            Invite Friends
                         </button>
                     </div>
 
-                    <div className="appointments-grid">
-                        <div className="appointments-main">
-                            {/* Next Appointment Featured */}
-                            {nextAppointment ? (
-                                <article className="appointment-featured">
-                                    <div className="appointment-image-wrapper">
-                                        <img
-                                            src="https://images.pexels.com/photos/7755237/pexels-photo-7755237.jpeg?auto=compress&cs=tinysrgb&w=400"
-                                            alt="Beauty salon appointment"
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        />
-                                        <div className="appointment-image-overlay"></div>
-                                    </div>
-                                    <div className="appointment-content">
-                                        <div className="appointment-header">
-                                            <div>
-                                                <h3 className="appointment-title">{nextAppointment.service}</h3>
-                                                <p className="appointment-meta">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                        <circle cx="12" cy="12" r="10" />
-                                                        <path d="M12 6v6l4 2" />
-                                                    </svg>
-                                                    <span>
-                                                        {new Date(nextAppointment.date).toLocaleDateString('hr-HR', {
-                                                            weekday: 'long',
-                                                            month: 'long',
-                                                            day: 'numeric'
-                                                        })} • {new Date(nextAppointment.date).toLocaleTimeString('hr-HR', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                    </span>
-                                                </p>
-                                                <p className="appointment-location">Studio A • s Irenom</p>
-                                            </div>
-                                            <div className="status-pill confirmed">
-                                                <span>Potvrđeno</span>
-                                            </div>
-                                        </div>
-                                        <div className="appointment-actions">
-                                            <button
-                                                onClick={() => router.push("/appointments")}
-                                                className="btn btn-primary btn-sm"
-                                            >
-                                                Upravljaj Terminima
-                                            </button>
-                                            <button
-                                                onClick={() => handleCancel(nextAppointment.id)}
-                                                className="btn btn-outline btn-sm"
-                                            >
-                                                Otkaži
-                                            </button>
-                                        </div>
-                                        <p className="appointment-note">
-                                            Otkazivanje besplatno do 24 sata prije termina
-                                        </p>
-                                    </div>
-                                </article>
-                            ) : (
-                                <article className="appointment-featured">
-                                    <div className="appointment-image-wrapper">
-                                        <img
-                                            src="https://images.pexels.com/photos/7755237/pexels-photo-7755237.jpeg?auto=compress&cs=tinysrgb&w=400"
-                                            alt="Beauty salon"
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        />
-                                        <div className="appointment-image-overlay"></div>
-                                    </div>
-                                    <div className="appointment-content">
-                                        <div className="appointment-header">
-                                            <div>
-                                                <h3 className="appointment-title">Nemaš nadolazećih termina</h3>
-                                                <p className="appointment-meta">
-                                                    <span>Rezerviraj svoj sljedeći tretman u 3 klika</span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="appointment-actions">
-                                            <button
-                                                onClick={() => router.push("/appointments")}
-                                                className="btn btn-primary"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                                                    <path d="M3 10h18M8 2v4m8-4v4" />
-                                                </svg>
-                                                <span>Rezerviraj Termin</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </article>
-                            )}
+                    {/* Tab Content */}
+                    <div className="tab-content-wrapper">
+                        {/* My Appointments Tab */}
+                        {activeTab === "appointments" && (
+                            <div className="tab-panel appointments-panel active">
+                                <header className="panel-header">
+                                    <h2 className="panel-title">My Appointments</h2>
+                                    <p className="panel-subtitle">
+                                        Upcoming bookings and recent visits — elegantly organized
+                                        for your convenience
+                                    </p>
+                                </header>
 
-                            {/* Upcoming Appointments List */}
-                            {upcomingAppts.length > 1 && (
-                                <div className="appointments-list">
-                                    <h3 className="list-heading">Ostali Nadolazeći Termini</h3>
-                                    {upcomingAppts.slice(1).map((a) => {
-                                        const appointmentDate = new Date(a.date);
-                                        const canCancel = appointmentDate.getTime() - Date.now() > 24 * 60 * 60 * 1000;
+                                <div className="appointments-content">
+                                    {/* Upcoming Appointments */}
+                                    <div className="appointments-upcoming">
+                                        <h3 className="section-label">Upcoming</h3>
 
-                                        return (
-                                            <article key={a.id} className="appointment-card">
-                                                <div className="appointment-card-date">
-                                                    <span className="date-day">{appointmentDate.getDate()}</span>
-                                                    <span className="date-month">
-                                                        {appointmentDate.toLocaleString('hr-HR', { month: 'short' })}
-                                                    </span>
+                                        {/* Main Featured Appointment */}
+                                        <article className="appointment-featured">
+                                            <div className="appointment-featured-image">
+                                                <div className="status-badge confirmed">Confirmed</div>
+                                            </div>
+                                            <div className="appointment-featured-content">
+                                                <h4 className="appointment-title">Gel Manicure</h4>
+                                                <div className="appointment-meta">
+                          <span className="appointment-date">
+                            Tomorrow • 14:30 • 60 min
+                          </span>
+                                                    <span className="appointment-location">
+                            Studio A • with Irena
+                          </span>
                                                 </div>
-                                                <div className="appointment-card-content">
-                                                    <h4 className="appointment-card-title">{a.service}</h4>
-                                                    <p className="appointment-card-meta">
-                                                        {appointmentDate.toLocaleString('hr-HR', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        })} • Studio A
+                                                <div className="appointment-actions">
+                                                    <button className="btn btn-secondary">
+                                                        Reschedule
+                                                    </button>
+                                                    <button className="btn btn-outline">Cancel</button>
+                                                </div>
+                                                <p className="appointment-note">
+                                                    Deposit paid: €15.00 • Cancellation free up to 24
+                                                    hours
+                                                </p>
+                                            </div>
+                                        </article>
+
+                                        {/* Additional Appointments */}
+                                        <div className="appointments-list">
+                                            <article className="appointment-card">
+                                                <div className="appointment-date-box">
+                                                    <span className="date-day">12</span>
+                                                    <span className="date-month">DEC</span>
+                                                </div>
+                                                <div className="appointment-info">
+                                                    <h4 className="appointment-name">
+                                                        Luxury Pedicure
+                                                    </h4>
+                                                    <p className="appointment-time">
+                                                        15:00 • 90 min • Studio B
                                                     </p>
-                                                    <p className="appointment-card-stylist">s Irenom</p>
+                                                    <p className="appointment-staff">with Sofia</p>
                                                 </div>
-                                                <div className="appointment-card-status">
-                                                    <div className="status-pill confirmed">
-                                                        <span>Potvrđeno</span>
-                                                    </div>
-                                                    {canCancel && (
-                                                        <button
-                                                            onClick={() => handleCancel(a.id)}
-                                                            className="btn btn-outline btn-sm"
-                                                        >
-                                                            Otkaži
-                                                        </button>
-                                                    )}
+                                                <div className="appointment-status">
+                          <span className="status-badge confirmed">
+                            Confirmed
+                          </span>
+                                                    <button className="btn-link">Details</button>
                                                 </div>
                                             </article>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
 
-                        {/* Sidebar */}
-                        <aside className="appointments-sidebar">
-                            {/* Stats Card */}
-                            <div className="recent-visits">
-                                <h3 className="sidebar-heading">Tvoja Statistika</h3>
-                                <div style={{ display: 'grid', gap: '1rem' }}>
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'rgba(248, 231, 231, 0.3)',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(212, 175, 55, 0.2)'
-                                    }}>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b6b6b', marginBottom: '0.25rem' }}>
-                                            Nadolazeći termini
-                                        </p>
-                                        <p style={{ fontSize: '2rem', fontWeight: '700', color: '#d4af37' }}>
-                                            {upcomingAppts.length}
-                                        </p>
+                                            <article className="appointment-card">
+                                                <div className="appointment-date-box">
+                                                    <span className="date-day">18</span>
+                                                    <span className="date-month">DEC</span>
+                                                </div>
+                                                <div className="appointment-info">
+                                                    <h4 className="appointment-name">Gel Manicure</h4>
+                                                    <p className="appointment-time">
+                                                        11:30 • 60 min • Studio A
+                                                    </p>
+                                                    <p className="appointment-staff">with Irena</p>
+                                                </div>
+                                                <div className="appointment-status">
+                          <span className="status-badge confirmed">
+                            Confirmed
+                          </span>
+                                                    <button className="btn-link">Details</button>
+                                                </div>
+                                            </article>
+                                        </div>
                                     </div>
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'rgba(99, 102, 241, 0.1)',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(99, 102, 241, 0.2)'
-                                    }}>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b6b6b', marginBottom: '0.25rem' }}>
-                                            Završeno
-                                        </p>
-                                        <p style={{ fontSize: '2rem', fontWeight: '700', color: '#4f46e5' }}>
-                                            {pastAppts.filter(a => a.status !== 'CANCELLED').length}
-                                        </p>
+
+                                    {/* Recent Visits */}
+                                    <div className="appointments-recent">
+                                        <h3 className="section-label">Recent Visits</h3>
+
+                                        <div className="visits-list">
+                                            <article className="visit-card">
+                                                <div className="visit-info">
+                                                    <h4 className="visit-name">Gel Manicure</h4>
+                                                    <p className="visit-date">Nov 25, 2025 • 14:00</p>
+                                                    <span className="status-badge completed">
+                            Completed
+                          </span>
+                                                </div>
+                                                <div className="visit-actions">
+                                                    <button className="btn btn-outline btn-sm">
+                                                        Review
+                                                    </button>
+                                                    <button className="btn-link">Rebook</button>
+                                                </div>
+                                            </article>
+
+                                            <article className="visit-card">
+                                                <div className="visit-info">
+                                                    <h4 className="visit-name">Luxury Pedicure</h4>
+                                                    <p className="visit-date">Nov 10, 2025 • 15:30</p>
+                                                    <span className="status-badge completed">
+                            Completed
+                          </span>
+                                                </div>
+                                                <div className="visit-actions">
+                                                    <button className="btn btn-outline btn-sm">
+                                                        Review
+                                                    </button>
+                                                    <button className="btn-link">Rebook</button>
+                                                </div>
+                                            </article>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        )}
 
-                            {/* Recent Visits */}
-                            {pastAppts.length > 0 && (
-                                <div className="recent-visits">
-                                    <h3 className="sidebar-heading">Nedavni Posjeti</h3>
-                                    {pastAppts.slice(0, 3).map((a) => {
-                                        const visitDate = new Date(a.date);
-                                        return (
-                                            <article key={a.id} className="visit-card">
-                                                <div className="visit-card-content">
-                                                    <h4 className="visit-card-title">{a.service}</h4>
-                                                    <p className="visit-card-meta">
-                                                        {visitDate.toLocaleDateString('hr-HR', {
-                                                            month: 'short',
-                                                            day: 'numeric',
-                                                            year: 'numeric'
-                                                        })} • {visitDate.toLocaleTimeString('hr-HR', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
+                        {/* Loyalty & Coupons Tab */}
+                        {activeTab === "loyalty" && (
+                            <div className="tab-panel loyalty-panel active">
+                                <header className="panel-header">
+                                    <h2 className="panel-title">Loyalty Points</h2>
+                                    <p className="panel-subtitle">
+                                        Your elegance, rewarded. Earn 1 point for every €1 spent.
+                                    </p>
+                                </header>
+
+                                <div className="loyalty-content">
+                                    <div className="loyalty-main">
+                                        {/* Points Balance */}
+                                        <div className="points-balance-card">
+                                            <div className="points-display">
+                                                <span className="points-number">238</span>
+                                                <span className="points-label">Points Available</span>
+                                            </div>
+
+                                            <div className="points-progress">
+                                                <div className="progress-info">
+                                                    <span>238 pts</span>
+                                                    <span>300 pts for €15 credit</span>
+                                                </div>
+                                                <div className="progress-bar">
+                                                    <div
+                                                        className="progress-fill"
+                                                        style={{ width: "79%" }}
+                                                    ></div>
+                                                </div>
+                                                <p className="progress-remaining">
+                                                    62 points to next reward
+                                                </p>
+                                            </div>
+
+                                            <div className="earning-ways">
+                                                <h3 className="subsection-title">Ways to Earn</h3>
+                                                <ul className="earning-list">
+                                                    <li>✓ Book appointments</li>
+                                                    <li>✓ Refer friends</li>
+                                                    <li>✓ Birthday bonus</li>
+                                                    <li>✓ Streak rewards</li>
+                                                </ul>
+                                            </div>
+
+                                            <div className="redemption-section">
+                                                <h3 className="subsection-title">Redeem Points</h3>
+                                                <p className="redemption-text">
+                                                    Convert points into coupons and apply at checkout.
+                                                </p>
+                                                <div className="redemption-buttons">
+                                                    <button className="btn btn-primary">
+                                                        50 pts → €5
+                                                    </button>
+                                                    <button className="btn btn-primary">
+                                                        120 pts → €15
+                                                    </button>
+                                                    <button className="btn btn-outline">Custom</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Available Coupons */}
+                                    <div className="coupons-sidebar">
+                                        <h3 className="sidebar-title">Available Coupons</h3>
+                                        <p className="sidebar-text">
+                                            Your active coupons are listed below. Tap to apply at
+                                            checkout.
+                                        </p>
+
+                                        <div className="coupons-list">
+                                            <article className="coupon-card">
+                                                <div className="coupon-icon">🎁</div>
+                                                <div className="coupon-details">
+                                                    <h4 className="coupon-title">€5 Off</h4>
+                                                    <p className="coupon-description">
+                                                        50 pts redemption
                                                     </p>
-                                                    <div className="status-pill completed">
-                                                        <span>{a.status === 'CANCELLED' ? 'Otkazano' : 'Završeno'}</span>
-                                                    </div>
+                                                    <p className="coupon-code">BLAB5</p>
+                                                    <p className="coupon-expiry">
+                                                        Expires: Apr 15, 2026
+                                                    </p>
+                                                </div>
+                                                <div className="coupon-actions">
+                                                    <button className="btn btn-outline btn-sm">
+                                                        Copy
+                                                    </button>
+                                                    <button className="btn btn-secondary btn-sm">
+                                                        Apply
+                                                    </button>
                                                 </div>
                                             </article>
-                                        );
-                                    })}
-                                </div>
-                            )}
 
-                            {/* Policy Notice */}
-                            <div className="policy-notice">
-                                <p className="policy-text">
-                                    Politika otkazivanja: Besplatno do 24 sata. Depoziti zadržani za kasna otkazivanja —
-                                    automatski konvertirani u salon kredit.
-                                </p>
+                                            <article className="coupon-card">
+                                                <div className="coupon-icon">✨</div>
+                                                <div className="coupon-details">
+                                                    <h4 className="coupon-title">15% Off</h4>
+                                                    <p className="coupon-description">
+                                                        Luxury Manicure
+                                                    </p>
+                                                    <p className="coupon-code">MANILUX15</p>
+                                                    <p className="coupon-expiry">
+                                                        Expires: Jun 1, 2026
+                                                    </p>
+                                                </div>
+                                                <div className="coupon-actions">
+                                                    <button className="btn btn-outline btn-sm">
+                                                        Copy
+                                                    </button>
+                                                    <button className="btn btn-secondary btn-sm">
+                                                        Apply
+                                                    </button>
+                                                </div>
+                                            </article>
+
+                                            <article className="coupon-card">
+                                                <div className="coupon-icon">🎁</div>
+                                                <div className="coupon-details">
+                                                    <h4 className="coupon-title">€15 Off</h4>
+                                                    <p className="coupon-description">
+                                                        120 pts redemption
+                                                    </p>
+                                                    <p className="coupon-code">BLAB15</p>
+                                                    <p className="coupon-expiry">
+                                                        Expires: May 30, 2026
+                                                    </p>
+                                                </div>
+                                                <div className="coupon-actions">
+                                                    <button className="btn btn-outline btn-sm">
+                                                        Copy
+                                                    </button>
+                                                    <button className="btn btn-secondary btn-sm">
+                                                        Apply
+                                                    </button>
+                                                </div>
+                                            </article>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </aside>
+                        )}
+
+                        {activeTab === 'invite' && (
+                            <div className="tab-panel invite-panel active">
+                                <div className="invite-content">
+                                    <div className="invite-hero">
+                                        <h2 className="invite-title">Invite Friends & Earn</h2>
+                                        <p className="invite-subtitle">Share your code and reward yourself with salon credit. You both earn €5.</p>
+                                        <div className="invite-code-section">
+                                            <span className="code-label">YOUR INVITE CODE</span>
+                                            <div className="code-display">BEAUTY238</div>
+                                            <div className="code-actions">
+                                                <button className="btn btn-primary"><span>📤</span> Share</button>
+                                                <button className="btn btn-outline"><span>📋</span> Copy Code</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="invite-body">
+                                        <div className="how-it-works">…</div>
+                                        <div className="share-section">…</div>
+                                        <div className="message-editor">…</div>
+                                        <div className="referral-stats">…</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 </div>
-            </section>
+            </main>
+
+            <Footer />
         </div>
     );
-}
+};
+
+export default UserDashboard;
