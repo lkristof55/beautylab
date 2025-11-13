@@ -27,11 +27,11 @@ export default function LoginPage() {
             const data = await res.json();
 
             if (res.ok) {
-                // ✅ Spremi usera i token u context (AuthContext)
+                // Spremi usera i token u context
                 login(data.user, data.token);
                 setMessage("✅ Prijava uspješna!");
 
-                // 🔥 FIX: Redirect na /dashboard umjesto /profile
+                // VAŽNO: Svi idu na /dashboard - sistem će prepoznati je li admin ili user
                 setTimeout(() => router.push("/dashboard"), 1000);
             } else {
                 setMessage(`❌ ${data.error || "Greška pri prijavi"}`);
