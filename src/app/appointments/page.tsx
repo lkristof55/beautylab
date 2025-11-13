@@ -9,10 +9,23 @@ type Appointment = {
     id: string;
     service: string;
     date: string; // ISO
+    duration?: number; // trajanje u minutama
     status?: "BOOKED" | "CANCELLED";
 };
 
-const SERVICES = ["Manikura", "Pedikura", "Depilacija", "Masaža"];
+// Konfiguracija usluga sa trajanjem
+const SERVICES_CONFIG = {
+    "Manikura": { duration: 45, price: 35, description: "Klasična manikura" },
+    "Gel nokti": { duration: 90, price: 55, description: "Gel lak koji traje 3-4 tjedna" },
+    "Pedikura": { duration: 60, price: 45, description: "Njega stopala" },
+    "Depilacija - noge": { duration: 45, price: 40, description: "Depilacija cijelih nogu" },
+    "Depilacija - bikini": { duration: 30, price: 30, description: "Bikini zona" },
+    "Masaža": { duration: 60, price: 60, description: "Relax masaža" },
+    "Trepavice": { duration: 90, price: 80, description: "Ugradnja trepavica" },
+    "Obrve": { duration: 30, price: 25, description: "Oblikovanje obrva" }
+};
+
+const SERVICES = Object.keys(SERVICES_CONFIG);
 
 export default function AppointmentsPage() {
     const router = useRouter();
@@ -20,8 +33,11 @@ export default function AppointmentsPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [service, setService] = useState("");
-    const [date, setDate] = useState<Date | null>(null);
+    // Modal states
+    const [showModal, setShowModal] = useState(false);
+    const [selectedService, setSelectedService] = useState("");
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [selectedTime, setSelectedTime] = useState("");
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -53,6 +69,41 @@ export default function AppointmentsPage() {
         boot();
     }, [router, token]);
 
+    // Generiraj dostupna vremena
+    const generateTimeSlots = () => {
+        const slots = [];
+        const startHour = 9; // Početak radnog vremena
+        const endHour = 19; // Kraj radnog vremena
+
+        for (let hour = startHour; hour < endHour; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+                const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                slots.push(timeString);
+            }
+        }
+        return slots;
+    };
+
+    // Provjeri je li vrijeme slobodno
+    const isTimeSlotAvailable = (date: Date, time: string, serviceDuration: number) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const slotStart = new Date(date);
+        slotStart.setHours(hours, minutes, 0, 0);
+        const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
+
+        // Provjeri koliziju sa postojećim terminima
+        return !appointments.some(apt => {
+            if (apt.status === "CANCELLED") return false;
+
+            const aptStart = new Date(apt.date);
+            const aptDuration = apt.duration || 60;
+            const aptEnd = new Date(aptStart.getTime() + aptDuration * 60000);
+
+            // Provjeri preklapanje
+            return (slotStart < aptEnd && slotEnd > aptStart);
+        });
+    };
+
     const within24h = (iso: string) => {
         const now = new Date().getTime();
         const when = new Date(iso).getTime();
@@ -61,21 +112,40 @@ export default function AppointmentsPage() {
 
     const createAppt = async () => {
         if (!token) return router.push("/login");
-        if (!service || !date) return setMsg({ type: "err", text: "Odaberi uslugu i datum." });
+        if (!selectedService || !selectedDate || !selectedTime) {
+            setMsg({ type: "err", text: "Molim odaberi sve podatke." });
+            return;
+        }
+
         setBusy(true);
         setMsg(null);
+
         try {
+            // Kombiniraj datum i vrijeme
+            const [hours, minutes] = selectedTime.split(':').map(Number);
+            const appointmentDate = new Date(selectedDate);
+            appointmentDate.setHours(hours, minutes, 0, 0);
+
+            const serviceConfig = SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG];
+
             const res = await fetch("/api/appointments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ service, date: date.toISOString() }),
+                body: JSON.stringify({
+                    service: selectedService,
+                    date: appointmentDate.toISOString(),
+                    duration: serviceConfig.duration
+                }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || "Neuspjela rezervacija");
-            setAppointments((prev) => [...prev, data.appointment]);
-            setService("");
-            setDate(null);
-            setMsg({ type: "ok", text: "Termin je rezerviran ✅" });
+
+            setAppointments((prev) => [...prev, { ...data.appointment, duration: serviceConfig.duration }]);
+            setShowModal(false);
+            setSelectedService("");
+            setSelectedDate(null);
+            setSelectedTime("");
+            setMsg({ type: "ok", text: `Termin rezerviran! ✅ Trajanje: ${serviceConfig.duration} min` });
         } catch (e: any) {
             setMsg({ type: "err", text: e?.message ?? "Greška pri rezervaciji." });
         } finally {
@@ -148,46 +218,13 @@ export default function AppointmentsPage() {
                         </div>
                     )}
 
-                    {/* Novi termin */}
-                    <section className="mb-8">
-                        <h2 className="mb-4 text-xl font-heading font-semibold text-gold">
-                            + Novi termin
-                        </h2>
-                        <div className="grid gap-4 sm:grid-cols-[1fr_260px_auto]">
-                            <select
-                                className="h-12 w-full rounded-lg border border-beige bg-white px-4 outline-none focus:ring-2 focus:ring-gold/40 transition"
-                                value={service}
-                                onChange={(e) => setService(e.target.value)}
-                            >
-                                <option value="">Odaberi uslugu…</option>
-                                {SERVICES.map((s) => (
-                                    <option key={s} value={s}>
-                                        {s}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <div>
-                                <DatePicker
-                                    selected={date}
-                                    onChange={(d) => setDate(d)}
-                                    showTimeSelect
-                                    timeIntervals={15}
-                                    dateFormat="dd.MM.yyyy. HH:mm"
-                                    placeholderText="Odaberi datum i vrijeme"
-                                    className="h-12 w-full rounded-lg border border-beige px-4 outline-none focus:ring-2 focus:ring-gold/40"
-                                />
-                            </div>
-
-                            <button
-                                onClick={createAppt}
-                                disabled={busy}
-                                className="h-12 rounded-lg bg-gold px-8 font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
-                            >
-                                {busy ? "Spremam…" : "Rezerviraj"}
-                            </button>
-                        </div>
-                    </section>
+                    {/* Gumb za novi termin */}
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="w-full md:w-auto px-6 py-3 bg-gold text-white rounded-lg font-semibold hover:brightness-95 transition"
+                    >
+                        + Rezerviraj novi termin
+                    </button>
                 </div>
 
                 {/* Lista termina */}
@@ -201,9 +238,12 @@ export default function AppointmentsPage() {
                             <p className="text-gray-600 mb-4">
                                 Nemaš još rezerviranih termina.
                             </p>
-                            <p className="text-sm text-gray-500">
-                                Odaberi uslugu i datum iznad za prvu rezervaciju! ☝️
-                            </p>
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="text-gold hover:underline"
+                            >
+                                Klikni ovdje za prvu rezervaciju!
+                            </button>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -214,7 +254,10 @@ export default function AppointmentsPage() {
                                         Usluga
                                     </th>
                                     <th className="px-4 py-3 font-semibold text-graphite">
-                                        Datum
+                                        Datum i vrijeme
+                                    </th>
+                                    <th className="px-4 py-3 font-semibold text-graphite">
+                                        Trajanje
                                     </th>
                                     <th className="px-4 py-3 font-semibold text-graphite">
                                         Status
@@ -231,6 +274,7 @@ export default function AppointmentsPage() {
                                     .map((a, i) => {
                                         const zebra = i % 2 === 0 ? "bg-white" : "bg-porcelain/30";
                                         const lock = within24h(a.date);
+                                        const serviceConfig = SERVICES_CONFIG[a.service as keyof typeof SERVICES_CONFIG];
                                         return (
                                             <tr key={a.id} className={`${zebra} border-b border-beige last:border-0`}>
                                                 <td className="px-4 py-4 font-medium">{a.service}</td>
@@ -241,29 +285,32 @@ export default function AppointmentsPage() {
                                                     })}
                                                 </td>
                                                 <td className="px-4 py-4">
-                                                        <span
-                                                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-                                                                a.status === "CANCELLED"
-                                                                    ? "bg-gray-100 text-gray-700 border border-gray-300"
-                                                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                                            }`}
-                                                        >
-                                                            {a.status ?? "BOOKED"}
-                                                        </span>
+                                                    {serviceConfig?.duration || 60} min
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                                                            a.status === "CANCELLED"
+                                                                ? "bg-gray-100 text-gray-700 border border-gray-300"
+                                                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                        }`}
+                                                    >
+                                                        {a.status === "CANCELLED" ? "OTKAZANO" : "POTVRĐENO"}
+                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-4 text-right">
                                                     {lock ? (
                                                         <span className="text-xs italic text-gray-500">
-                                                                Nije moguće otkazati (&lt; 24h)
-                                                            </span>
-                                                    ) : (
+                                                            Nije moguće otkazati (&lt; 24h)
+                                                        </span>
+                                                    ) : a.status !== "CANCELLED" ? (
                                                         <button
                                                             onClick={() => cancelAppt(a.id)}
                                                             className="rounded-lg border border-red-300 bg-red-50 px-4 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100"
                                                         >
                                                             Otkaži
                                                         </button>
-                                                    )}
+                                                    ) : null}
                                                 </td>
                                             </tr>
                                         );
@@ -274,6 +321,147 @@ export default function AppointmentsPage() {
                     )}
                 </div>
             </div>
+
+            {/* Modal za rezervaciju */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-beige">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-heading font-bold text-graphite">
+                                    Novi termin
+                                </h2>
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            {/* Odabir usluge */}
+                            <div>
+                                <label className="block text-sm font-medium text-graphite mb-2">
+                                    Odaberi uslugu
+                                </label>
+                                <select
+                                    className="w-full h-12 rounded-lg border border-beige bg-white px-4 outline-none focus:ring-2 focus:ring-gold/40"
+                                    value={selectedService}
+                                    onChange={(e) => setSelectedService(e.target.value)}
+                                >
+                                    <option value="">-- Odaberi --</option>
+                                    {SERVICES.map((service) => {
+                                        const config = SERVICES_CONFIG[service as keyof typeof SERVICES_CONFIG];
+                                        return (
+                                            <option key={service} value={service}>
+                                                {service} ({config.duration} min) - €{config.price}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                {selectedService && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG].description}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Odabir datuma */}
+                            {selectedService && (
+                                <div>
+                                    <label className="block text-sm font-medium text-graphite mb-2">
+                                        Odaberi datum
+                                    </label>
+                                    <DatePicker
+                                        selected={selectedDate}
+                                        onChange={(date) => setSelectedDate(date)}
+                                        minDate={new Date()}
+                                        maxDate={new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)} // 60 dana unaprijed
+                                        dateFormat="dd.MM.yyyy."
+                                        placeholderText="Klikni za odabir datuma"
+                                        className="w-full h-12 rounded-lg border border-beige px-4 outline-none focus:ring-2 focus:ring-gold/40"
+                                        inline
+                                    />
+                                </div>
+                            )}
+
+                            {/* Odabir vremena */}
+                            {selectedDate && selectedService && (
+                                <div>
+                                    <label className="block text-sm font-medium text-graphite mb-2">
+                                        Odaberi vrijeme
+                                    </label>
+                                    <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-2 border border-beige rounded-lg">
+                                        {generateTimeSlots().map(time => {
+                                            const duration = SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG].duration;
+                                            const isAvailable = isTimeSlotAvailable(selectedDate, time, duration);
+
+                                            return (
+                                                <button
+                                                    key={time}
+                                                    onClick={() => isAvailable && setSelectedTime(time)}
+                                                    disabled={!isAvailable}
+                                                    className={`
+                                                        p-2 text-sm rounded-lg transition
+                                                        ${selectedTime === time
+                                                        ? 'bg-gold text-white'
+                                                        : isAvailable
+                                                            ? 'bg-white border border-beige hover:bg-porcelain'
+                                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                                    }
+                                                    `}
+                                                >
+                                                    {time}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pregled rezervacije */}
+                            {selectedService && selectedDate && selectedTime && (
+                                <div className="bg-porcelain/30 rounded-lg p-4">
+                                    <h3 className="font-semibold text-graphite mb-2">Pregled rezervacije:</h3>
+                                    <p className="text-sm">
+                                        <strong>Usluga:</strong> {selectedService}
+                                    </p>
+                                    <p className="text-sm">
+                                        <strong>Datum:</strong> {selectedDate.toLocaleDateString('hr-HR')}
+                                    </p>
+                                    <p className="text-sm">
+                                        <strong>Vrijeme:</strong> {selectedTime}
+                                    </p>
+                                    <p className="text-sm">
+                                        <strong>Trajanje:</strong> {SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG].duration} min
+                                    </p>
+                                    <p className="text-sm">
+                                        <strong>Cijena:</strong> €{SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG].price}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-beige flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="px-4 py-2 border border-beige rounded-lg hover:bg-porcelain transition"
+                            >
+                                Odustani
+                            </button>
+                            <button
+                                onClick={createAppt}
+                                disabled={busy || !selectedService || !selectedDate || !selectedTime}
+                                className="px-4 py-2 bg-gold text-white rounded-lg font-semibold hover:brightness-95 transition disabled:opacity-60"
+                            >
+                                {busy ? "Rezerviram..." : "Potvrdi rezervaciju"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

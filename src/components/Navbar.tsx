@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
-export default function Navbar() {
+export default function Navbar({ className = "" }) {
+
     const { user, logout } = useAuth();
     const [menuOpen, setMenuOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -42,9 +43,10 @@ export default function Navbar() {
     }, []);
 
     return (
-        <div className="navigation-container1">
-            <nav id="navigationMain" className="navigation">
-                <div className="navigation__container">
+        <nav className={`navbar ${className}`}>
+            <div id="navigationMain" className="navigation">
+
+            <div className="navigation__container">
                     {/* Logo */}
                     <Link href="/" className="no-underline">
                         <div
@@ -180,7 +182,8 @@ export default function Navbar() {
                         </div>
                     </div>
                 </div>
-            </nav>
-        </div>
+            </div>
+        </nav>
     );
+
 }

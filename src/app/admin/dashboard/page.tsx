@@ -5,17 +5,26 @@ import { useRouter } from 'next/navigation'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import './dashboard-styles.css'
+import '../../dashboard/dashboard-styles.css'
+
+
 
 // Import admin komponenti
-import AdminCalendar from './AdminCalendar'
-import AdminUsers from './AdminUsers'
-import AdminStats from './AdminStats'
+import AdminUsers from "../users/page.tsx";
+import AdminStats from '../stats/page.tsx'
+
+
+
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('calendar')
     const [user, setUser] = useState<any>(null)
     const router = useRouter()
+
+    useEffect(() => {
+        const overlay = document.querySelector(".booking-sidebar-overlay");
+        if (overlay) overlay.remove();
+    }, []);
 
     useEffect(() => {
         const userData = localStorage.getItem('user')
@@ -316,4 +325,125 @@ export default function AdminDashboard() {
             </main>
         </div>
     )
+}
+
+function AdminCalendar() {
+    const [appointments, setAppointments] = useState([]);
+    const [showManualModal, setShowManualModal] = useState(false);
+    const [manualDate, setManualDate] = useState(null);
+    const [manualService, setManualService] = useState("");
+    const [manualTime, setManualTime] = useState("");
+
+    const fetchAdminAppointments = async () => {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/admin/appointments", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setAppointments(data);
+        }
+    };
+
+    useEffect(() => {
+        fetchAdminAppointments();
+    }, []);
+
+    const handleDateClick = (info) => {
+        setManualDate(new Date(info.date));
+        setShowManualModal(true);
+    };
+
+    const saveManualAppointment = async () => {
+        if (!manualDate || !manualTime || !manualService) return;
+
+        const [h, m] = manualTime.split(":");
+        const start = new Date(manualDate);
+        start.setHours(Number(h), Number(m), 0, 0);
+
+        const token = localStorage.getItem("token");
+
+        const res = await fetch("/api/appointments", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                service: manualService,
+                date: start.toISOString(),
+                duration: 60,
+                adminCreated: true
+            })
+        });
+
+        if (res.ok) {
+            setShowManualModal(false);
+            fetchAdminAppointments();
+        }
+    };
+
+    const calendarEvents = appointments.map((apt) => {
+        const start = new Date(apt.date);
+        const end = new Date(start.getTime() + (apt.duration || 60) * 60000);
+
+        return {
+            id: apt.id,
+            title: `${apt.service} – ${apt.user?.name || ""}`,
+            start,
+            end,
+            backgroundColor: "#e07e9e",
+            textColor: "#fff"
+        };
+    });
+
+
+    return (
+        <div style={{ background: "white", padding: "2rem", borderRadius: "1rem", height: "100%" }}>
+            <FullCalendar
+                plugins={[dayGridPlugin, interactionPlugin]}
+                initialView="dayGridMonth"
+                dateClick={handleDateClick}
+                events={calendarEvents}
+                headerToolbar={{
+                    left: "prev,next today",
+                    center: "title",
+                    right: "dayGridMonth,dayGridWeek,dayGridDay",
+                }}
+                eventClick={(info) => {
+                    // blokiraj event klik
+                    info.jsEvent.preventDefault();
+                    info.jsEvent.stopPropagation();
+                }}
+            />
+
+
+
+            {showManualModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h2>Dodaj termin</h2>
+
+                        <label>Usluga</label>
+                        <select onChange={(e) => setManualService(e.target.value)}>
+                            <option value="">Odaberi...</option>
+                            <option value="Lash Lift">Lash Lift</option>
+                            <option value="Brow Lift">Brow Lift</option>
+                            <option value="Nokti">Nokti</option>
+                        </select>
+
+                        <label>Vrijeme</label>
+                        <input type="time" onChange={(e) => setManualTime(e.target.value)} />
+
+                        <button className="btn btn-primary" onClick={saveManualAppointment}>
+                            Spremi
+                        </button>
+                        <button className="btn btn-outline" onClick={() => setShowManualModal(false)}>
+                            Zatvori
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
