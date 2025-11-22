@@ -1230,4 +1230,221 @@ p, span, li, a, button {
 .profile-item.logout { color: #8b1e2e; }
 
 
+/* ----------------------------- */
+/* 🎭 MODAL COMPONENTS            */
+/* ----------------------------- */
+.booking-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+    background: color-mix(in srgb, var(--color-scrim) 60%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+.booking-modal {
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-2xl) var(--spacing-3xl);
+    margin: auto;
+    animation: fadeSlideIn 0.3s var(--animation-curve-primary);
+    opacity: 1;
+    transform: translateY(0);
+    z-index: 10000;
+    /* Glass panel stil */
+    border: 1px solid color-mix(in srgb, var(--color-border) 15%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+    box-shadow: var(--shadow-level-2),
+        inset 0 0 0 1px color-mix(in srgb, var(--color-border) 20%, transparent),
+        inset 0 2px 0 0 color-mix(in srgb, var(--color-accent) 8%, transparent);
+    border-radius: var(--border-radius-xl);
+    backdrop-filter: blur(20px) saturate(1.1);
+    -webkit-backdrop-filter: blur(20px) saturate(1.1);
+}
+
+.booking-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+}
+
+.booking-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--color-on-surface-secondary);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-sm);
+    transition: all 0.2s ease;
+}
+
+.booking-modal-close:hover {
+    background: color-mix(in srgb, var(--color-border) 30%, transparent);
+    color: var(--color-on-surface);
+    transform: rotate(90deg);
+}
+
+.booking-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    flex: 1;
+}
+
+.booking-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.booking-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-on-surface);
+    font-family: var(--font-family-body);
+}
+
+.booking-input {
+    width: 100%;
+    padding: var(--spacing-md);
+    border: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+    color: var(--color-on-surface);
+    font-size: var(--font-size-base);
+    font-family: var(--font-family-body);
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.booking-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-outline) 20%, transparent);
+    background: var(--color-surface);
+}
+
+.booking-input::placeholder {
+    color: var(--color-on-surface-secondary);
+    opacity: 0.6;
+}
+
+.booking-times {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.booking-time {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    border: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+    color: var(--color-on-surface);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family-body);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.booking-time:hover:not(:disabled):not(.disabled) {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    transform: translateY(-1px);
+}
+
+.booking-time.active {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-level-2);
+}
+
+.booking-time:disabled,
+.booking-time.disabled {
+    background: color-mix(in srgb, var(--color-border) 20%, transparent);
+    color: var(--color-on-surface-secondary);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.booking-msg {
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family-body);
+    text-align: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.booking-msg.success {
+    background: color-mix(in srgb, #10b981 15%, transparent);
+    color: #065f46;
+    border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+}
+
+.booking-msg.error {
+    background: color-mix(in srgb, #ef4444 15%, transparent);
+    color: #991b1b;
+    border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+}
+
+.booking-modal-footer {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: flex-end;
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 20%, transparent);
+}
+
+.booking-modal-footer .btn {
+    min-width: 120px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .booking-modal {
+        max-width: 100%;
+        padding: var(--spacing-xl) var(--spacing-lg);
+    }
+
+    .booking-times {
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+        gap: var(--spacing-xs);
+    }
+
+    .booking-modal-footer {
+        flex-direction: column;
+    }
+
+    .booking-modal-footer .btn {
+        width: 100%;
+    }
+}
+
+
 

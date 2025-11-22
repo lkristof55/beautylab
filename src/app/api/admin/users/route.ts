@@ -14,8 +14,9 @@ export async function GET(req: Request) {
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
 
-        const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-        if (user?.email !== process.env.ADMIN_EMAIL) {
+        // Provjeri da li je admin
+        const adminUser = await prisma.user.findUnique({ where: { id: decoded.userId } });
+        if (!adminUser || (!adminUser.isAdmin && adminUser.email !== "irena@beautylab.hr")) {
             return NextResponse.json({ error: "Not authorized" }, { status: 403 });
         }
 

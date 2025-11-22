@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useAuth } from "@/context/AuthContext";
 
 type Appointment = {
     id: string;
@@ -24,25 +25,48 @@ const SERVICES_CONFIG = {
 
 const SERVICES = Object.keys(SERVICES_CONFIG);
 
-export default function BookAppointmentSidebar({
-                                                   open,
-                                                   onClose,
-                                                   token,
-                                                   appointments,
-                                                   refresh
-                                               }: {
+export default function BookAppointmentModal({
+    open,
+    onClose,
+    onSuccess
+}: {
     open: boolean;
     onClose: () => void;
-    token: string;
-    appointments: Appointment[];
-    refresh: () => void;
+    onSuccess?: () => void;
 }) {
-
+    const { user } = useAuth();
     const [selectedService, setSelectedService] = useState("");
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState("");
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+
+    // Fetch appointments kada se modal otvori
+    useEffect(() => {
+        if (open && user) {
+            fetchAppointments();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, user]);
+
+    const fetchAppointments = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            const res = await fetch("/api/appointments", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setAppointments(data.appointments || []);
+            }
+        } catch (error) {
+            console.error("Error fetching appointments:", error);
+        }
+    };
 
     const resetForm = () => {
         setSelectedService("");
@@ -50,7 +74,6 @@ export default function BookAppointmentSidebar({
         setSelectedTime("");
         setMsg(null);
     };
-
 
     const generateTimeSlots = () => {
         const slots: string[] = [];
@@ -88,11 +111,18 @@ export default function BookAppointmentSidebar({
         setBusy(true);
         setMsg(null);
 
+        const token = localStorage.getItem("token");
+        if (!token) {
+            setMsg("Niste prijavljeni.");
+            setBusy(false);
+            return;
+        }
+
         const [h, m] = selectedTime.split(":").map(Number);
         const apptDate = new Date(selectedDate);
         apptDate.setHours(h, m, 0, 0);
 
-        const duration = SERVICES_CONFIG[selectedService].duration;
+        const duration = SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG].duration;
 
         try {
             const res = await fetch("/api/appointments", {
@@ -108,68 +138,100 @@ export default function BookAppointmentSidebar({
                 })
             });
 
-            if (!res.ok) throw new Error();
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Greška pri spremanju termina.");
+            }
 
+            resetForm();
+            if (onSuccess) onSuccess();
             onClose();
-            refresh();
-
-        } catch (e) {
-            setMsg("Greška pri spremanju termina.");
+        } catch (e: any) {
+            setMsg(e.message || "Greška pri spremanju termina.");
         } finally {
             setBusy(false);
         }
     };
 
-    return (
-        <div className={`booking-sidebar-overlay ${open ? "open" : ""}`}>
-            <div className={`booking-sidebar ${open ? "open" : ""}`}>
-                {/* HEADER */}
-                <div className="booking-header">
-                    <h2>Novi termin</h2>
+    if (!open) return null;
 
+    // Handler za overlay - zatvori modal samo ako se klikne direktno na overlay
+    const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Zatvori modal samo ako se klikne direktno na overlay (ne na modal ili njegov sadržaj)
+        if (e.target === e.currentTarget) {
+            onClose();
+        }
+    };
+
+    return (
+        <div className="booking-modal-overlay" onClick={handleOverlayClick}>
+            <div className="booking-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="booking-modal-header">
+                    <h2 style={{ 
+                        fontSize: "var(--font-size-xl)", 
+                        marginBottom: 0,
+                        color: "var(--color-on-surface)",
+                        fontFamily: "var(--font-family-heading)",
+                        fontWeight: 700
+                    }}>
+                        Rezerviraj termin
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="booking-modal-close"
+                        aria-label="Zatvori"
+                    >
+                        ×
+                    </button>
                 </div>
 
-                {/* BODY */}
-                <div className="booking-body">
-                    {msg && <div className="booking-msg">{msg}</div>}
+                <div className="booking-modal-body">
+                    {msg && (
+                        <div className={`booking-msg ${msg.includes("Greška") ? "error" : "success"}`}>
+                            {msg}
+                        </div>
+                    )}
 
                     {/* Service */}
-                    <label>Usluga</label>
-                    <select
-                        className="booking-input"
-                        value={selectedService}
-                        onChange={(e) => setSelectedService(e.target.value)}
-                    >
-                        <option value="">Odaberi...</option>
-                        {SERVICES.map((s) => (
-                            <option key={s} value={s}>
-                                {s} ({SERVICES_CONFIG[s].duration} min)
-                            </option>
-                        ))}
-                    </select>
+                    <div className="booking-field">
+                        <label className="booking-label">Usluga</label>
+                        <select
+                            className="booking-input"
+                            value={selectedService}
+                            onChange={(e) => setSelectedService(e.target.value)}
+                        >
+                            <option value="">Odaberi uslugu...</option>
+                            {SERVICES.map((s) => (
+                                <option key={s} value={s}>
+                                    {s} ({SERVICES_CONFIG[s as keyof typeof SERVICES_CONFIG].duration} min)
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     {/* Date */}
                     {selectedService && (
-                        <>
-                            <label style={{ marginTop: "1rem" }}>Datum</label>
+                        <div className="booking-field">
+                            <label className="booking-label">Datum</label>
                             <DatePicker
                                 selected={selectedDate}
                                 onChange={(d) => setSelectedDate(d)}
                                 minDate={new Date()}
                                 className="booking-input"
                                 dateFormat="dd.MM.yyyy."
+                                placeholderText="Odaberi datum..."
                             />
-                        </>
+                        </div>
                     )}
 
                     {/* Time */}
                     {selectedDate && (
-                        <>
-                            <label style={{ marginTop: "1rem" }}>Vrijeme</label>
+                        <div className="booking-field">
+                            <label className="booking-label">Vrijeme</label>
                             <div className="booking-times">
                                 {generateTimeSlots().map((time) => {
                                     const duration =
-                                        SERVICES_CONFIG[selectedService].duration;
+                                        SERVICES_CONFIG[selectedService as keyof typeof SERVICES_CONFIG].duration;
                                     const available = isTimeSlotAvailable(
                                         selectedDate,
                                         time,
@@ -178,27 +240,23 @@ export default function BookAppointmentSidebar({
                                     return (
                                         <button
                                             key={time}
+                                            type="button"
                                             className={`booking-time ${
-                                                selectedTime === time
-                                                    ? "active"
-                                                    : ""
-                                            }`}
+                                                selectedTime === time ? "active" : ""
+                                            } ${!available ? "disabled" : ""}`}
                                             disabled={!available}
-                                            onClick={() =>
-                                                available && setSelectedTime(time)
-                                            }
+                                            onClick={() => available && setSelectedTime(time)}
                                         >
                                             {time}
                                         </button>
                                     );
                                 })}
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
 
-                {/* FOOTER */}
-                <div className="booking-footer">
+                <div className="booking-modal-footer">
                     <button
                         onClick={() => {
                             resetForm();
@@ -214,10 +272,11 @@ export default function BookAppointmentSidebar({
                         disabled={!selectedService || !selectedDate || !selectedTime || busy}
                         className="btn btn-primary"
                     >
-                        {busy ? "Spremam..." : "Potvrdi"}
+                        {busy ? "Spremam..." : "Potvrdi rezervaciju"}
                     </button>
                 </div>
             </div>
         </div>
     );
 }
+

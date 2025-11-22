@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
-  console.log("🧩 Middleware aktivan:", req.nextUrl.pathname);
+  // Middleware za buduće proširenje (npr. rate limiting, logging)
   return NextResponse.next();
 }
 

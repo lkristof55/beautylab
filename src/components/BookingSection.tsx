@@ -125,7 +125,7 @@ export default function BookingSection() {
                             Mention allergies or sensitivities for a flawless experience.
                         </p>
                     </div>
-                    <a href="/appointments">
+                    <a href="/dashboard">
                         <div
                             aria-label="Start booking — three clicks"
                             className="btn booking-cta btn-primary"

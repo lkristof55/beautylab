@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 
 interface User {
     id: string;
@@ -16,25 +16,147 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Vrijeme neaktivnosti prije automatskog logout-a (30 minuta u milisekundama)
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minuta
+// Interval provjere neaktivnosti (svakih 30 sekundi)
+const CHECK_INTERVAL = 30 * 1000; // 30 sekundi
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
+    const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) setUser(JSON.parse(storedUser));
+    const logout = useCallback(() => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("lastActivity");
+        setUser(null);
+        
+        // Očisti timere
+        if (inactivityTimerRef.current) {
+            clearTimeout(inactivityTimerRef.current);
+            inactivityTimerRef.current = null;
+        }
+        if (checkIntervalRef.current) {
+            clearInterval(checkIntervalRef.current);
+            checkIntervalRef.current = null;
+        }
     }, []);
+
+    const updateLastActivity = useCallback(() => {
+        const currentUser = localStorage.getItem("user");
+        if (currentUser) {
+            localStorage.setItem("lastActivity", Date.now().toString());
+        }
+    }, []);
+
+    const checkInactivity = useCallback(() => {
+        const currentUser = localStorage.getItem("user");
+        if (!currentUser) {
+            setUser(null);
+            return;
+        }
+
+        const lastActivity = localStorage.getItem("lastActivity");
+        if (!lastActivity) {
+            updateLastActivity();
+            return;
+        }
+
+        const timeSinceLastActivity = Date.now() - parseInt(lastActivity, 10);
+        
+        if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
+            // Automatski logout nakon 30 minuta neaktivnosti
+            logout();
+        }
+    }, [updateLastActivity, logout]);
 
     const login = (user: User, token: string) => {
         localStorage.setItem("token", token);
         localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("lastActivity", Date.now().toString());
         setUser(user);
     };
 
-    const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setUser(null);
-    };
+    useEffect(() => {
+        // Učitaj korisnika iz localStorage pri inicijalizaciji
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            // Provjeri neaktivnost prije nego što učitaš korisnika
+            const lastActivity = localStorage.getItem("lastActivity");
+            if (lastActivity) {
+                const timeSinceLastActivity = Date.now() - parseInt(lastActivity, 10);
+                if (timeSinceLastActivity >= INACTIVITY_TIMEOUT) {
+                    // Korisnik je bio neaktivan preko 30 minuta, očisti sve
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+                    localStorage.removeItem("lastActivity");
+                    return;
+                }
+            }
+            
+            setUser(JSON.parse(storedUser));
+            // Postavi lastActivity ako ne postoji
+            if (!localStorage.getItem("lastActivity")) {
+                localStorage.setItem("lastActivity", Date.now().toString());
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!user) {
+            // Ako nema korisnika, očisti timere
+            if (checkIntervalRef.current) {
+                clearInterval(checkIntervalRef.current);
+                checkIntervalRef.current = null;
+            }
+            return;
+        }
+
+        // Postavi event listenere za praćenje aktivnosti
+        const activityEvents = ["mousedown", "mousemove", "keypress", "scroll", "touchstart", "click"];
+        
+        const handleActivity = () => {
+            updateLastActivity();
+        };
+
+        // Handler za kada se tab vrati u fokus
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                // Provjeri neaktivnost kada se tab vrati u fokus
+                checkInactivity();
+                updateLastActivity();
+            }
+        };
+
+        // Dodaj event listenere
+        activityEvents.forEach((event) => {
+            window.addEventListener(event, handleActivity, true);
+        });
+        
+        // Dodaj listener za promjenu vidljivosti taba
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        // Postavi interval za provjeru neaktivnosti
+        checkIntervalRef.current = setInterval(() => {
+            checkInactivity();
+        }, CHECK_INTERVAL);
+
+        // Provjeri neaktivnost odmah
+        checkInactivity();
+
+        // Cleanup funkcija
+        return () => {
+            activityEvents.forEach((event) => {
+                window.removeEventListener(event, handleActivity, true);
+            });
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            if (checkIntervalRef.current) {
+                clearInterval(checkIntervalRef.current);
+                checkIntervalRef.current = null;
+            }
+        };
+    }, [user, checkInactivity, updateLastActivity]);
 
     return (
         <AuthContext.Provider value={{ user, login, logout }}>

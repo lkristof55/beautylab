@@ -32,20 +32,76 @@ export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
         const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-        const { date, service } = await req.json();
+        const { date, service, duration } = await req.json();
 
         if (!date || !service) {
-            return NextResponse.json({ error: "Date and service required" }, { status: 400 });
+            return NextResponse.json({ error: "Datum i usluga su obavezni" }, { status: 400 });
+        }
+
+        const appointmentDate = new Date(date);
+        const now = new Date();
+
+        // Provjera da termin nije u prošlosti
+        if (appointmentDate < now) {
+            return NextResponse.json(
+                { error: "Ne možete rezervirati termin u prošlosti" },
+                { status: 400 }
+            );
+        }
+
+        // Provjera radnog vremena (9:00 - 19:00)
+        const hour = appointmentDate.getHours();
+        if (hour < 9 || hour >= 19) {
+            return NextResponse.json(
+                { error: "Radno vrijeme je od 9:00 do 19:00" },
+                { status: 400 }
+            );
+        }
+
+        // Provjera zauzetosti termina
+        const appointmentDuration = duration || 60; // default 60 minuta
+        const appointmentEnd = new Date(appointmentDate.getTime() + appointmentDuration * 60000);
+
+        const conflictingAppointments = await prisma.appointment.findMany({
+            where: {
+                date: {
+                    lt: appointmentEnd,
+                },
+            },
+        });
+
+        // Provjeri preklapanje
+        for (const existing of conflictingAppointments) {
+            const existingStart = new Date(existing.date);
+            const existingDuration = 60; // default duration
+            const existingEnd = new Date(existingStart.getTime() + existingDuration * 60000);
+
+            // Provjeri preklapanje
+            if (
+                (appointmentDate >= existingStart && appointmentDate < existingEnd) ||
+                (appointmentEnd > existingStart && appointmentEnd <= existingEnd) ||
+                (appointmentDate <= existingStart && appointmentEnd >= existingEnd)
+            ) {
+                return NextResponse.json(
+                    {
+                        error: `Termin je zauzet. Već postoji rezervacija od ${existingStart.toLocaleTimeString("hr-HR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        })}`,
+                    },
+                    { status: 409 }
+                );
+            }
         }
 
         const appointment = await prisma.appointment.create({
             data: {
-                date: new Date(date),
+                date: appointmentDate,
                 service,
                 userId: decoded.userId,
             },
@@ -54,7 +110,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ appointment });
     } catch (error) {
         console.error("POST /appointments error:", error);
-        return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+        if (error instanceof jwt.JsonWebTokenError) {
+            return NextResponse.json({ error: "Nevažeći token" }, { status: 401 });
+        }
+        return NextResponse.json({ error: "Greška pri kreiranju termina" }, { status: 500 });
     }
 }
 

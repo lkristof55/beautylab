@@ -129,18 +129,26 @@ export default function Navbar({ className = "" }) {
                         <div className="navigation__actions">
                             {!user ? (
                                 <>
-                                    <Link
-                                        href="/login"
+                                    <button
+                                        onClick={() => {
+                                            if ((window as any).openLoginModal) {
+                                                (window as any).openLoginModal();
+                                            }
+                                        }}
                                         className="navigation__button btn btn-outline"
                                     >
                                         Sign In
-                                    </Link>
-                                    <Link
-                                        href="/register"
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if ((window as any).openRegisterModal) {
+                                                (window as any).openRegisterModal();
+                                            }
+                                        }}
                                         className="navigation__button btn btn-primary"
                                     >
                                         Register
-                                    </Link>
+                                    </button>
                                 </>
                             ) : (
                                 <div className="navigation__profile">
@@ -167,7 +175,7 @@ export default function Navbar({ className = "" }) {
                                         <a href="/dashboard" className="profile-item">
                                             Profil
                                         </a>
-                                        <a href="/appointments" className="profile-item">
+                                        <a href="/dashboard" className="profile-item">
                                             Moji termini
                                         </a>
                                         <a href="/dashboard" className="profile-item">

@@ -7,32 +7,116 @@ datasource db {
   url      = "file:./prisma/dev.db"
 }
 
-
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  password      String
-  isAdmin       Boolean  @default(false)  // <- DODAJ OVO
-  inviteCode    String?
-  appointments  Appointment[]
-  createdAt     DateTime @default(now())
+  id                  String                @id @default(cuid())
+  name                String
+  email               String                @unique
+  password            String
+  isAdmin             Boolean               @default(false)
+  inviteCode          String?
+  loyaltyPoints       Int                   @default(0)
+  loyaltyTier         String                @default("Bronze") // Bronze, Silver, Gold, Platinum
+  totalVisits         Int                   @default(0)
+  totalSpent          Float                 @default(0)
+  createdAt           DateTime              @default(now())
+  appointments        Appointment[]
+  loyaltyTransactions LoyaltyTransaction[]
 }
 
 model Appointment {
-  id          String   @id @default(cuid())
-  date        DateTime
-  service     String
-  user        User?    @relation(fields: [userId], references: [id])
-  userId      String?
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  date              DateTime
+  service           String
+  userId            String?
+  isCompleted       Boolean  @default(false)
+  pointsEarned      Int?     // Bodovi dobiveni za ovaj termin
+  unregisteredName  String?  // Ime i prezime neregistriranog korisnika
+  unregisteredPhone String?  // Kontakt broj neregistriranog korisnika
+  createdAt         DateTime @default(now())
+  user              User?    @relation(fields: [userId], references: [id])
 }
 
 model InviteCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  createdBy String
+  usedBy    String?
+  createdAt DateTime @default(now())
+}
+
+model LoyaltyTransaction {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  points        Int         // + za dobivene, - za potrošene
+  type          String       // "earned", "redeemed", "bonus", "admin_adjust"
+  description   String
+  appointmentId String?
+  rewardId      String?     // Ako je tip "redeemed", povezano s nagradom
+  createdAt     DateTime    @default(now())
+}
+
+model LoyaltyReward {
   id          String   @id @default(cuid())
-  code        String   @unique
-  createdBy   String
-  usedBy      String?   // promjena: više nije lista
+  name        String
+  description String
+  pointsCost  Int
+  discount    Int?     // Postotak popusta (10, 15, 20, etc.)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 }
 
+model Settings {
+  id                              String   @id @default(cuid())
+  
+  // Email notifikacije
+  emailNotificationsEnabled       Boolean  @default(true)
+  emailNewAppointments             Boolean  @default(true)
+  emailNewUsers                    Boolean  @default(true)
+  emailIncompleteAppointments      Boolean  @default(true)
+  emailDailySummary                Boolean  @default(false)
+  notificationEmail                String   @default("irena@beautylab.hr")
+  
+  // Radno vrijeme (JSON string za kompleksnije strukture)
+  workingDays                      String   @default("[\"monday\",\"tuesday\",\"wednesday\",\"thursday\",\"friday\"]") // JSON array
+  workingHoursStart                String   @default("09:00")
+  workingHoursEnd                  String   @default("18:00")
+  breakStart                       String?  // npr. "13:00"
+  breakEnd                         String?  // npr. "14:00"
+  holidays                         String?  // JSON array datuma
+  
+  // Loyalty postavke
+  defaultPointsPerService          Int      @default(10)
+  bronzeThreshold                  Int      @default(0)
+  silverThreshold                  Int      @default(100)
+  goldThreshold                    Int      @default(300)
+  platinumThreshold                Int      @default(500)
+  inviteCodeBonusPoints            Int      @default(15)
+  autoUpdateTiers                  Boolean  @default(true)
+  
+  // Notifikacije postavke
+  notificationRefreshInterval      Int      @default(30) // sekunde
+  showNewAppointmentNotifications  Boolean  @default(true)
+  showTodayAppointmentNotifications Boolean @default(true)
+  showNewUserNotifications         Boolean  @default(true)
+  showIncompleteNotifications     Boolean  @default(true)
+  notificationSoundEnabled         Boolean  @default(false)
+  
+  // Automatske akcije
+  autoCompleteAppointments         Boolean  @default(false)
+  autoCompleteAfterHours           Int?     // Automatski complete nakon X sati
+  autoDeleteOldAppointments        Boolean  @default(false)
+  autoDeleteAfterDays              Int?     // Automatski brisanje nakon X dana
+  autoSendReminderEmails           Boolean  @default(false)
+  reminderEmailHoursBefore         Int?     // Slanje reminder emaila X sati prije
+  
+  // Općenito
+  theme                            String   @default("light") // "light" ili "dark"
+  language                         String   @default("hr") // "hr" ili "en"
+  dateFormat                       String   @default("DD.MM.YYYY")
+  timeFormat                       String   @default("24h") // "24h" ili "12h"
+  timezone                         String   @default("Europe/Zagreb")
+  
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+}
