@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-// Helper funkcija za provjeru admina
-async function checkAdmin(token: string) {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-    const adminEmail = "irena@beautylab.hr";
-    if (!user || (!user.isAdmin && user.email !== adminEmail)) {
-        return null;
-    }
-    return decoded;
-}
+import { checkAdmin } from "@/lib/auth";
+import { findAvailableEmployee } from "@/lib/employees";
+import { SERVICES_CONFIG } from "@/lib/services";
 
 export async function GET(req: Request) {
     try {
@@ -29,7 +18,10 @@ export async function GET(req: Request) {
         }
 
         const appointments = await prisma.appointment.findMany({
-            include: { user: { select: { name: true, email: true } } },
+            include: { 
+                user: { select: { name: true, email: true } },
+                assignedEmployee: { select: { id: true, name: true, email: true } }
+            },
             orderBy: { date: "asc" },
         });
 
@@ -149,25 +141,53 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Termini se mogu rezervirati samo između 9:00 i 19:00." }, { status: 400 });
         }
 
-        // Provjera preklapanja termina
-        const serviceDuration = duration || 60;
+        // Provjera preklapanja termina s maxConcurrent ograničenjem
+        const serviceConfig = SERVICES_CONFIG[service];
+        const serviceDuration = duration || serviceConfig?.duration || 60;
         const appointmentEnd = new Date(appointmentDate.getTime() + serviceDuration * 60000);
+        const maxConcurrent = serviceConfig?.maxConcurrent || 1;
 
-        const overlappingAppointment = await prisma.appointment.findFirst({
+        // Pronađi sve termine iste usluge koji se preklapaju s novim terminom
+        const overlappingAppointments = await prisma.appointment.findMany({
+            where: {
+                service: service,
+                date: {
+                    lt: appointmentEnd,
+                },
+                AND: {
+                    date: {
+                        gte: appointmentDate,
+                    },
+                },
+            },
+        });
+
+        // Provjeri preklapanje sa svim postojećim terminima (ne samo iste usluge)
+        const allOverlapping = await prisma.appointment.findFirst({
             where: {
                 date: {
                     lt: appointmentEnd,
                 },
                 AND: {
                     date: {
-                        gt: new Date(appointmentDate.getTime() - serviceDuration * 60000),
+                        gte: appointmentDate,
                     },
                 },
             },
         });
 
-        if (overlappingAppointment) {
+        if (allOverlapping) {
             return NextResponse.json({ error: "Odabrani termin se preklapa s postojećim terminom." }, { status: 400 });
+        }
+
+        // Provjeri maxConcurrent za istu uslugu
+        if (overlappingAppointments.length >= maxConcurrent) {
+            return NextResponse.json(
+                {
+                    error: `Maksimalan broj istovremenih rezervacija za uslugu "${service}" je ${maxConcurrent}. Već postoji ${overlappingAppointments.length} rezervacija u tom vremenskom slotu.`,
+                },
+                { status: 409 }
+            );
         }
 
         const appointmentData: any = {
@@ -186,9 +206,18 @@ export async function POST(req: Request) {
             appointmentData.unregisteredPhone = unregisteredUser.phone;
         }
 
+        // Automatska dodjela zaposlenika
+        const assignedEmployeeId = await findAvailableEmployee(service, appointmentDate, appointmentEnd);
+        if (assignedEmployeeId) {
+            appointmentData.assignedEmployeeId = assignedEmployeeId;
+        }
+
         const appointment = await prisma.appointment.create({
             data: appointmentData,
-            include: { user: { select: { name: true, email: true } } },
+            include: { 
+                user: { select: { name: true, email: true } },
+                assignedEmployee: { select: { id: true, name: true, email: true } }
+            },
         });
 
         return NextResponse.json({ appointment, message: "Termin uspješno kreiran" });

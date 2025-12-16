@@ -6,12 +6,14 @@ interface User {
     id: string;
     name: string;
     email: string;
+    role?: string;
 }
 
 interface AuthContextType {
     user: User | null;
     login: (user: User, token: string) => void;
     logout: () => void;
+    refreshToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,11 +22,46 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minuta
 // Interval provjere neaktivnosti (svakih 30 sekundi)
 const CHECK_INTERVAL = 30 * 1000; // 30 sekundi
+// Interval za refresh tokena (svakih 50 minuta - prije isteka od 1h)
+const TOKEN_REFRESH_INTERVAL = 50 * 60 * 1000; // 50 minuta
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
     const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const tokenRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const refreshToken = useCallback(async (): Promise<boolean> => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            return false;
+        }
+
+        try {
+            const res = await fetch("/api/auth/refresh", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem("token", data.token);
+                if (data.user) {
+                    localStorage.setItem("user", JSON.stringify(data.user));
+                    setUser(data.user);
+                }
+                return true;
+            } else {
+                // Token refresh neuspješan, logout korisnika
+                logout();
+                return false;
+            }
+        } catch (error) {
+            console.error("Greška pri osvježavanju tokena:", error);
+            return false;
+        }
+    }, []);
 
     const logout = useCallback(() => {
         localStorage.removeItem("token");
@@ -40,6 +77,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (checkIntervalRef.current) {
             clearInterval(checkIntervalRef.current);
             checkIntervalRef.current = null;
+        }
+        if (tokenRefreshIntervalRef.current) {
+            clearInterval(tokenRefreshIntervalRef.current);
+            tokenRefreshIntervalRef.current = null;
         }
     }, []);
 
@@ -110,6 +151,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 clearInterval(checkIntervalRef.current);
                 checkIntervalRef.current = null;
             }
+            if (tokenRefreshIntervalRef.current) {
+                clearInterval(tokenRefreshIntervalRef.current);
+                tokenRefreshIntervalRef.current = null;
+            }
             return;
         }
 
@@ -142,8 +187,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             checkInactivity();
         }, CHECK_INTERVAL);
 
+        // Postavi interval za refresh tokena (svakih 50 minuta)
+        tokenRefreshIntervalRef.current = setInterval(() => {
+            refreshToken();
+        }, TOKEN_REFRESH_INTERVAL);
+
         // Provjeri neaktivnost odmah
         checkInactivity();
+        
+        // Ne pozivaj refreshToken odmah - interval će to obaviti kada bude potrebno
 
         // Cleanup funkcija
         return () => {
@@ -155,11 +207,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 clearInterval(checkIntervalRef.current);
                 checkIntervalRef.current = null;
             }
+            if (tokenRefreshIntervalRef.current) {
+                clearInterval(tokenRefreshIntervalRef.current);
+                tokenRefreshIntervalRef.current = null;
+            }
         };
-    }, [user, checkInactivity, updateLastActivity]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]); // Samo user dependency - funkcije su stable zbog useCallback
 
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ user, login, logout, refreshToken }}>
             {children}
         </AuthContext.Provider>
     );

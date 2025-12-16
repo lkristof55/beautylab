@@ -50,7 +50,7 @@ export default function Navbar({ className = "" }) {
                     {/* Logo */}
                     <Link href="/" className="no-underline">
                         <div
-                            aria-label="Beauty Lab by Irena Homepage"
+                            aria-label="Beauty Lab by Irena Početna stranica"
                             className="navigation__logo"
                         >
               <span className="navigation__logo-text text-[1.2rem] font-serif tracking-wide">
@@ -63,7 +63,7 @@ export default function Navbar({ className = "" }) {
                     {/* Mobile Toggle */}
                     <button
                         id="navigationToggle"
-                        aria-label="Toggle Navigation Menu"
+                        aria-label="Prebaci navigacijski izbornik"
                         aria-expanded={menuOpen}
                         className="navigation__toggle"
                         onClick={() => setMenuOpen(!menuOpen)}
@@ -105,22 +105,22 @@ export default function Navbar({ className = "" }) {
                         <ul className="navigation__list">
                             <li className="navigation__item">
                                 <Link href="#services" className="navigation__link">
-                                    <span>Services</span>
+                                    <span>Usluge</span>
                                 </Link>
                             </li>
                             <li className="navigation__item">
                                 <Link href="#about" className="navigation__link">
-                                    <span>About</span>
+                                    <span>O Nama</span>
                                 </Link>
                             </li>
                             <li className="navigation__item">
                                 <Link href="#gallery" className="navigation__link">
-                                    <span>Gallery</span>
+                                    <span>Galerija</span>
                                 </Link>
                             </li>
                             <li className="navigation__item">
                                 <Link href="#contact" className="navigation__link">
-                                    <span>Contact</span>
+                                    <span>Kontakt</span>
                                 </Link>
                             </li>
                         </ul>
@@ -137,7 +137,7 @@ export default function Navbar({ className = "" }) {
                                         }}
                                         className="navigation__button btn btn-outline"
                                     >
-                                        Sign In
+                                        Prijava
                                     </button>
                                     <button
                                         onClick={() => {
@@ -147,13 +147,13 @@ export default function Navbar({ className = "" }) {
                                         }}
                                         className="navigation__button btn btn-primary"
                                     >
-                                        Register
+                                        Registracija
                                     </button>
                                 </>
                             ) : (
                                 <div className="navigation__profile">
                                     <button
-                                        aria-label="User menu"
+                                        aria-label="Korisnički izbornik"
                                         className="profile-button"
                                         onClick={(e) => {
                                             e.stopPropagation();

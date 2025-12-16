@@ -1,33 +1,20 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-// Helper funkcija za provjeru admina
-async function checkAdmin(token: string) {
-  const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-  const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-  const adminEmail = "irena@beautylab.hr";
-  if (!user || (!user.isAdmin && user.email !== adminEmail)) {
-    return null;
-  }
-  return decoded;
-}
+import { checkOwnerOrAdmin } from "@/lib/auth";
 
 // GET - dohvati sve invite kodove
 export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
     }
 
     const token = authHeader.split(" ")[1];
-    const admin = await checkAdmin(token);
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const authCheck = await checkOwnerOrAdmin(token);
+    if (!authCheck) {
+      return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
     }
 
     // Dohvati sve invite kodove (i admin i user kodove)
@@ -55,7 +42,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ inviteCodes: codesWithUsers });
   } catch (error) {
     console.error("GET invite codes error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
   }
 }
 
@@ -64,13 +51,13 @@ export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
     }
 
     const token = authHeader.split(" ")[1];
-    const admin = await checkAdmin(token);
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const authCheck = await checkOwnerOrAdmin(token);
+    if (!authCheck) {
+      return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
     }
 
     // Generiraj random kod (BEAUTY-XXXX)
@@ -90,7 +77,7 @@ export async function POST(req: Request) {
       const inviteCode = await prisma.inviteCode.create({
         data: {
           code: newCode,
-          createdBy: admin.userId,
+          createdBy: authCheck.decoded.userId,
         },
       });
 
@@ -100,14 +87,14 @@ export async function POST(req: Request) {
     const inviteCode = await prisma.inviteCode.create({
       data: {
         code,
-        createdBy: admin.userId,
+        createdBy: authCheck.decoded.userId,
       },
     });
 
     return NextResponse.json({ inviteCode }, { status: 201 });
   } catch (error) {
     console.error("POST invite code error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
   }
 }
 
@@ -116,13 +103,13 @@ export async function DELETE(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
     }
 
     const token = authHeader.split(" ")[1];
-    const admin = await checkAdmin(token);
-    if (!admin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const authCheck = await checkOwnerOrAdmin(token);
+    if (!authCheck) {
+      return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -161,7 +148,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ message: "Invite code obrisan" });
   } catch (error) {
     console.error("DELETE invite code error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
   }
 }
 

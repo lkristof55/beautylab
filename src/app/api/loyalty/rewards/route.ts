@@ -4,6 +4,10 @@ import prisma from "@/lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
+if (!JWT_SECRET) {
+    console.error("JWT_SECRET nije definiran u environment varijablama");
+}
+
 // GET - dohvati dostupne nagrade
 export async function GET(req: Request) {
     try {
@@ -15,16 +19,24 @@ export async function GET(req: Request) {
         return NextResponse.json({ rewards });
     } catch (error) {
         console.error("GET /loyalty/rewards error:", error);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
     }
 }
 
 // POST - iskoristi nagradu (kuponi)
 export async function POST(req: Request) {
     try {
+        if (!JWT_SECRET) {
+            console.error("JWT_SECRET nije definiran u environment varijablama");
+            return NextResponse.json(
+                { error: "Greška konfiguracije servera" },
+                { status: 500 }
+            );
+        }
+
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
@@ -32,7 +44,7 @@ export async function POST(req: Request) {
         const { rewardId } = await req.json();
 
         if (!rewardId) {
-            return NextResponse.json({ error: "Reward ID required" }, { status: 400 });
+            return NextResponse.json({ error: "ID nagrade je obavezan" }, { status: 400 });
         }
 
         // Provjeri nagradu
@@ -41,7 +53,7 @@ export async function POST(req: Request) {
         });
 
         if (!reward || !reward.isActive) {
-            return NextResponse.json({ error: "Reward not found or inactive" }, { status: 404 });
+            return NextResponse.json({ error: "Nagrada nije pronađena ili nije aktivna" }, { status: 404 });
         }
 
         // Provjeri korisnika i bodove
@@ -50,7 +62,7 @@ export async function POST(req: Request) {
         });
 
         if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
+            return NextResponse.json({ error: "Korisnik nije pronađen" }, { status: 404 });
         }
 
         if (user.loyaltyPoints < reward.pointsCost) {
@@ -90,7 +102,7 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error("POST /loyalty/rewards error:", error);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
     }
 }
 

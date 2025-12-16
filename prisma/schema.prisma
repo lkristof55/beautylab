@@ -7,12 +7,19 @@ datasource db {
   url      = "file:./prisma/dev.db"
 }
 
+enum Role {
+  OWNER
+  ADMIN
+  MODERATOR
+  CLIENT
+}
+
 model User {
   id                  String                @id @default(cuid())
   name                String
   email               String                @unique
   password            String
-  isAdmin             Boolean               @default(false)
+  role                Role                  @default(CLIENT)
   inviteCode          String?
   loyaltyPoints       Int                   @default(0)
   loyaltyTier         String                @default("Bronze") // Bronze, Silver, Gold, Platinum
@@ -21,19 +28,24 @@ model User {
   createdAt           DateTime              @default(now())
   appointments        Appointment[]
   loyaltyTransactions LoyaltyTransaction[]
+  payments            Payment[]
 }
 
 model Appointment {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   date              DateTime
   service           String
   userId            String?
-  isCompleted       Boolean  @default(false)
-  pointsEarned      Int?     // Bodovi dobiveni za ovaj termin
-  unregisteredName  String?  // Ime i prezime neregistriranog korisnika
-  unregisteredPhone String?  // Kontakt broj neregistriranog korisnika
-  createdAt         DateTime @default(now())
-  user              User?    @relation(fields: [userId], references: [id])
+  assignedEmployeeId String?
+  isCompleted       Boolean   @default(false)
+  pointsEarned      Int?      // Bodovi dobiveni za ovaj termin
+  discountApplied   Float?    @default(0) // Popust primijenjen na termin (u kunama)
+  unregisteredName  String?   // Ime i prezime neregistriranog korisnika
+  unregisteredPhone String?   // Kontakt broj neregistriranog korisnika
+  createdAt         DateTime  @default(now())
+  user              User?     @relation(fields: [userId], references: [id])
+  assignedEmployee  Employee? @relation(fields: [assignedEmployeeId], references: [id])
+  payments          Payment[]
 }
 
 model InviteCode {
@@ -66,6 +78,38 @@ model LoyaltyReward {
   createdAt   DateTime @default(now())
 }
 
+model Employee {
+  id        String        @id @default(cuid())
+  name      String
+  email     String        @unique
+  phone     String?
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  appointments Appointment[]
+}
+
+model Payment {
+  id               String      @id @default(cuid())
+  appointmentId    String?
+  userId           String
+  amount           Float
+  paymentMethod    String       // "cash", "card", "loyalty", "mixed"
+  loyaltyPointsUsed Int?        @default(0)
+  discountApplied  Float?       @default(0)
+  createdAt        DateTime     @default(now())
+  user             User         @relation(fields: [userId], references: [id])
+  appointment      Appointment? @relation(fields: [appointmentId], references: [id])
+}
+
+model CashRegister {
+  id                String   @id @default(cuid())
+  date              DateTime @unique
+  totalAmount       Float    @default(0)
+  totalTransactions Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 model Settings {
   id                              String   @id @default(cuid())
   
@@ -93,6 +137,7 @@ model Settings {
   platinumThreshold                Int      @default(500)
   inviteCodeBonusPoints            Int      @default(15)
   autoUpdateTiers                  Boolean  @default(true)
+  pointsPerCurrencyUnit            Float    @default(1.0) // Bodovi po kuni (npr. 1 bod = 1 kn)
   
   // Notifikacije postavke
   notificationRefreshInterval      Int      @default(30) // sekunde

@@ -50,7 +50,7 @@ export default function HeroSection() {
                     <div className="glass-panel">
                         <h1 className="hero-title">Beauty Lab by Irena</h1>
                         <p className="hero-subtitle">
-                            Beauty is the illumination of your soul
+                            Ljepota je osvjetljenje tvoje duše
                         </p>
                         <p className="hero-intro">
                             Doživi svoj trenutak luksuza i mira. Dobrodošla u Beauty Lab by Irena.

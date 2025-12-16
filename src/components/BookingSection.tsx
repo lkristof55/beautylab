@@ -1,24 +1,44 @@
 ﻿"use client";
 
 import React from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function BookingSection() {
+    const { user } = useAuth();
+    const router = useRouter();
+
+    const handleBookingClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!user) {
+            // Ako nije prijavljen, postavi flag i otvori login modal
+            if (typeof window !== "undefined") {
+                sessionStorage.setItem("clickedReserve", "true");
+                if ((window as any).openLoginModal) {
+                    (window as any).openLoginModal();
+                }
+            }
+        } else {
+            // Ako je prijavljen, idi na dashboard
+            router.push("/dashboard");
+        }
+    };
     return (
         <section id="booking" className="booking-section">
             <div className="booking-container">
-                {/* Lijeva strana — naslov i intro */}
+                {/* Lijeva strana, naslov i intro */}
                 <div className="booking-intro">
                     <h2 id="booking-onboarding-title" className="section-title">
-                        Three Effortless Steps
+                        Kako rezervirati?
                     </h2>
                     <p className="section-content">
-                        Book in three clicks and arrive relaxed.
+                        Rezerviraj u tri klika, dođi i uživaj.
                     </p>
                 </div>
 
-                {/* Sredina — koraci */}
+                {/* Sredina, koraci */}
                 <div className="booking-steps">
-                    <ol aria-label="Booking process steps" className="steps-list">
+                    <ol aria-label="Koraci procesa rezervacije" className="steps-list">
                         <li className="step-card">
                             <div className="step-number">
                                 <svg
@@ -43,10 +63,10 @@ export default function BookingSection() {
                                 <span>01</span>
                             </div>
                             <div className="step-content">
-                                <h3 className="step-title">Choose your service</h3>
+                                <h3 className="step-title">Odaberi uslugu</h3>
                                 <p className="step-description">
-                                    Manicure, Pedicure, Waxing, Brows & Lashes. Select a signature
-                                    treatment or bespoke combination tailored by Irena.
+                                    Manikura, Pedikura, Depilacija. Odaberi potpisni
+                                    tretman ili prilagođenu kombinaciju koju je pripremila Irena.
                                 </p>
                             </div>
                         </li>
@@ -74,10 +94,10 @@ export default function BookingSection() {
                                 <span>02</span>
                             </div>
                             <div className="step-content">
-                                <h3 className="step-title">Pick a time</h3>
+                                <h3 className="step-title">Odaberi vrijeme</h3>
                                 <p className="step-description">
-                                    Real-time availability, instant confirmation. Morning, midday
-                                    or evening—reserve the moment that fits your rhythm.
+                                    Dostupnost u stvarnom vremenu, trenutna potvrda. Jutro, podne
+                                    ili večer, rezerviraj trenutak koji odgovara tvom ritmu.
                                 </p>
                             </div>
                         </li>
@@ -103,36 +123,37 @@ export default function BookingSection() {
                                 <span>03</span>
                             </div>
                             <div className="step-content">
-                                <h3 className="step-title">Add details & confirm</h3>
+                                <h3 className="step-title">Potvrdi rezervaciju</h3>
                                 <p className="step-description">
-                                    Preference notes, color choice, and any special requests.
-                                    Secure your appointment with a single confirmation.
+                                    Pregledaj svoje podatke i potvrdi rezervaciju. 
+                                    Tvoj termin je rezerviran u samo nekoliko trenutaka.
                                 </p>
                             </div>
                         </li>
                     </ol>
                 </div>
 
-                {/* Desna strana — dodatne informacije */}
+                {/* Desna strana, dodatne informacije */}
                 <div className="booking-reinforcement">
                     <div className="reinforcement-content">
                         <p className="reinforcement-text">
-                            A refined, streamlined path designed for discerning clients —
-                            clarity, speed, and personalized luxury.
+                            Rafiniran, pojednostavljen put dizajniran za zahtjevne klijentice,
+                            jasnoća, brzina i personalizirani luksuz.
                         </p>
                         <p className="reinforcement-tips">
-                            Want a matching set? Note your preferred polish shade. New to us?
-                            Mention allergies or sensitivities for a flawless experience.
+                            Sve što ti treba za rezervaciju je nekoliko minuta. 
+                            Odaberi svoju omiljenu uslugu i termin koji ti odgovara.
                         </p>
                     </div>
-                    <a href="/dashboard">
-                        <div
-                            aria-label="Start booking — three clicks"
-                            className="btn booking-cta btn-primary"
-                        >
-                            <span>Ready in 3 clicks</span>
-                        </div>
-                    </a>
+                    <button
+                        type="button"
+                        onClick={handleBookingClick}
+                        aria-label="Započni rezervaciju, tri klika"
+                        className="btn booking-cta btn-primary"
+                        style={{ width: '100%', cursor: 'pointer' }}
+                    >
+                        <span>Spremno u 3 klika</span>
+                    </button>
                 </div>
             </div>
         </section>

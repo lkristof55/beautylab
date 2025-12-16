@@ -6,7 +6,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 🌸 Global Background Image — fixed hero bg */
+/* 🌸 Global Background Image, fixed hero bg */
 body {
     background-image: url("/images/salon-bg.jpg"); /* ✅ ispravan put */
     background-size: cover;
@@ -27,7 +27,7 @@ body::before {
 
 
 /* ----------------------------- */
-/* 🌸 BEAUTY LAB — BRAND SYSTEM  */
+/* 🌸 BEAUTY LAB, BRAND SYSTEM  */
 /* ----------------------------- */
 
 :root {

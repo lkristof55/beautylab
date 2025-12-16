@@ -1,31 +1,26 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
 import { getSettings, calculateTierFromSettings } from "@/lib/settings";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
+import { checkOwnerAdminOrModerator } from "@/lib/auth";
 
 // POST - označi termin kao završen i dodijeli bodove
 export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-
-        // Provjeri da li je admin
-        const adminUser = await prisma.user.findUnique({ where: { id: decoded.userId } });
-        if (!adminUser || (!adminUser.isAdmin && adminUser.email !== "irena@beautylab.hr")) {
-            return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+        const authCheck = await checkOwnerAdminOrModerator(token);
+        if (!authCheck) {
+            return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
         }
 
         const { appointmentId } = await req.json();
 
         if (!appointmentId) {
-            return NextResponse.json({ error: "Appointment ID required" }, { status: 400 });
+            return NextResponse.json({ error: "ID termina je obavezan" }, { status: 400 });
         }
 
         // Pronađi termin
@@ -35,15 +30,15 @@ export async function POST(req: Request) {
         });
 
         if (!appointment) {
-            return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+            return NextResponse.json({ error: "Termin nije pronađen" }, { status: 404 });
         }
 
         if (appointment.isCompleted) {
-            return NextResponse.json({ error: "Appointment already completed" }, { status: 400 });
+            return NextResponse.json({ error: "Termin je već označen kao završen" }, { status: 400 });
         }
 
         if (!appointment.userId) {
-            return NextResponse.json({ error: "Appointment has no user" }, { status: 400 });
+            return NextResponse.json({ error: "Termin nema povezanog korisnika" }, { status: 400 });
         }
 
         // Dohvati postavke
@@ -105,7 +100,7 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error("POST /admin/appointments/complete error:", error);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
     }
 }
 
@@ -118,10 +113,101 @@ function calculatePointsForService(service: string, defaultPoints: number): numb
         "Depilacija - noge": 10,
         "Depilacija - bikini": 8,
         "Masaža": 15,
-        "Trepavice": 20,
-        "Obrve": 8,
     };
 
     return servicePoints[service] || defaultPoints;
+}
+
+// PUT - označi termin kao neizvršen i oduzmi bodove
+export async function PUT(req: Request) {
+    try {
+        const authHeader = req.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
+        }
+
+        const token = authHeader.split(" ")[1];
+        const authCheck = await checkOwnerAdminOrModerator(token);
+        if (!authCheck) {
+            return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
+        }
+
+        const { appointmentId } = await req.json();
+
+        if (!appointmentId) {
+            return NextResponse.json({ error: "ID termina je obavezan" }, { status: 400 });
+        }
+
+        // Pronađi termin
+        const appointment = await prisma.appointment.findUnique({
+            where: { id: appointmentId },
+            include: { user: true },
+        });
+
+        if (!appointment) {
+            return NextResponse.json({ error: "Termin nije pronađen" }, { status: 404 });
+        }
+
+        if (!appointment.isCompleted) {
+            return NextResponse.json({ error: "Termin nije označen kao završen" }, { status: 400 });
+        }
+
+        if (!appointment.userId) {
+            return NextResponse.json({ error: "Termin nema povezanog korisnika" }, { status: 400 });
+        }
+
+        // Oduzmi bodove ako su bili dodijeljeni
+        if (appointment.pointsEarned && appointment.pointsEarned > 0) {
+            // Provjeri da korisnik ima dovoljno bodova
+            const user = await prisma.user.findUnique({
+                where: { id: appointment.userId },
+            });
+
+            if (!user) {
+                return NextResponse.json({ error: "Korisnik nije pronađen" }, { status: 404 });
+            }
+
+            // Oduzmi bodove (ali ne dozvoli negativne bodove)
+            const newPoints = Math.max(0, user.loyaltyPoints - appointment.pointsEarned);
+
+            await prisma.user.update({
+                where: { id: appointment.userId },
+                data: {
+                    loyaltyPoints: newPoints,
+                    totalVisits: {
+                        decrement: 1,
+                    },
+                },
+            });
+
+            // Kreiraj transakciju za oduzimanje bodova
+            await prisma.loyaltyTransaction.create({
+                data: {
+                    userId: appointment.userId,
+                    points: -appointment.pointsEarned,
+                    type: "admin_adjust",
+                    description: `Oduzeto ${appointment.pointsEarned} bodova - termin označen kao neizvršen: ${appointment.service}`,
+                    appointmentId: appointmentId,
+                },
+            });
+        }
+
+        // Ažuriraj termin
+        await prisma.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                isCompleted: false,
+                pointsEarned: null,
+            },
+        });
+
+        return NextResponse.json({
+            message: "Termin označen kao neizvršen",
+            pointsRemoved: appointment.pointsEarned || 0,
+        });
+    } catch (error) {
+        console.error("PUT /admin/appointments/complete error:", error);
+        return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
+    }
 }
 

@@ -7,11 +7,21 @@ interface Appointment {
     service: string;
     date: string;
     user?: { name: string; email: string };
+    assignedEmployee?: { id: string; name: string; email: string } | null;
+    assignedEmployeeId?: string | null;
+}
+
+interface Employee {
+    id: string;
+    name: string;
+    email: string;
+    isActive: boolean;
 }
 
 interface EditAppointmentFormProps {
     appointment: Appointment;
-    onSave: (date: string, service: string) => void;
+    employees?: Employee[];
+    onSave: (date: string, service: string, assignedEmployeeId?: string) => void;
     onCancel: () => void;
 }
 
@@ -21,18 +31,17 @@ const SERVICES = [
     "Pedikura",
     "Depilacija - noge",
     "Depilacija - bikini",
-    "Masaža",
-    "Trepavice",
-    "Obrve"
+    "Masaža"
 ];
 
-export default function EditAppointmentForm({ appointment, onSave, onCancel }: EditAppointmentFormProps) {
+export default function EditAppointmentForm({ appointment, employees = [], onSave, onCancel }: EditAppointmentFormProps) {
     const [date, setDate] = useState(new Date(appointment.date).toISOString().slice(0, 16));
     const [service, setService] = useState(appointment.service);
+    const [assignedEmployeeId, setAssignedEmployeeId] = useState<string>(appointment.assignedEmployeeId || "");
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(date, service);
+        onSave(date, service, assignedEmployeeId || undefined);
     };
 
     return (
@@ -76,6 +85,31 @@ export default function EditAppointmentForm({ appointment, onSave, onCancel }: E
                     }}
                 />
             </div>
+            {employees.length > 0 && (
+                <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                        Dodijeljeni zaposlenik
+                    </label>
+                    <select
+                        value={assignedEmployeeId}
+                        onChange={(e) => setAssignedEmployeeId(e.target.value)}
+                        style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            border: "1px solid var(--beige)",
+                            borderRadius: "8px",
+                            fontSize: "1rem",
+                        }}
+                    >
+                        <option value="">Nije dodijeljen</option>
+                        {employees.filter(emp => emp.isActive).map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                                {emp.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
             <div style={{ display: "flex", gap: "0.5rem" }}>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
                     Spremi

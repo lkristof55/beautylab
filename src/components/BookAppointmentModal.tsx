@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useAuth } from "@/context/AuthContext";
+import { SERVICES_CONFIG, SERVICES } from "@/lib/services";
 
 type Appointment = {
     id: string;
@@ -11,19 +12,6 @@ type Appointment = {
     date: string;
     duration?: number;
 };
-
-const SERVICES_CONFIG = {
-    "Manikura": { duration: 45, price: 35 },
-    "Gel nokti": { duration: 90, price: 55 },
-    "Pedikura": { duration: 60, price: 45 },
-    "Depilacija - noge": { duration: 45, price: 40 },
-    "Depilacija - bikini": { duration: 30, price: 30 },
-    "Masaža": { duration: 60, price: 60 },
-    "Trepavice": { duration: 90, price: 80 },
-    "Obrve": { duration: 30, price: 25 }
-};
-
-const SERVICES = Object.keys(SERVICES_CONFIG);
 
 export default function BookAppointmentModal({
     open,
@@ -87,19 +75,27 @@ export default function BookAppointmentModal({
         return slots;
     };
 
-    const isTimeSlotAvailable = (date: Date, time: string, duration: number) => {
+    const isTimeSlotAvailable = (date: Date, time: string, duration: number, service: string) => {
         const [h, m] = time.split(":").map(Number);
         const slotStart = new Date(date);
         slotStart.setHours(h, m, 0, 0);
         const slotEnd = new Date(slotStart.getTime() + duration * 60000);
 
-        return !appointments.some((apt) => {
+        // Provjeri maxConcurrent za odabranu uslugu
+        const serviceConfig = SERVICES_CONFIG[service as keyof typeof SERVICES_CONFIG];
+        const maxConcurrent = serviceConfig?.maxConcurrent || 1;
+
+        // Broji koliko termina iste usluge već postoji u tom vremenskom slotu
+        const concurrentCount = appointments.filter((apt) => {
+            if (apt.service !== service) return false;
             const aptStart = new Date(apt.date);
             const aptEnd = new Date(
                 aptStart.getTime() + (apt.duration || 60) * 60000
             );
             return slotStart < aptEnd && slotEnd > aptStart;
-        });
+        }).length;
+
+        return concurrentCount < maxConcurrent;
     };
 
     const createAppt = async () => {
@@ -235,7 +231,8 @@ export default function BookAppointmentModal({
                                     const available = isTimeSlotAvailable(
                                         selectedDate,
                                         time,
-                                        duration
+                                        duration,
+                                        selectedService
                                     );
                                     return (
                                         <button

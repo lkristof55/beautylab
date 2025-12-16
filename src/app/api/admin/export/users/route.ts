@@ -1,30 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-async function checkAdmin(token: string) {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-    const adminEmail = "irena@beautylab.hr";
-    if (!user || (!user.isAdmin && user.email !== adminEmail)) {
-        return null;
-    }
-    return decoded;
-}
+import { checkAdmin } from "@/lib/auth";
 
 export async function GET(req: Request) {
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
         const admin = await checkAdmin(token);
         if (!admin) {
-            return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+            return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
         }
 
         const users = await prisma.user.findMany({
@@ -33,7 +21,7 @@ export async function GET(req: Request) {
                 id: true,
                 name: true,
                 email: true,
-                isAdmin: true,
+                role: true,
                 loyaltyPoints: true,
                 loyaltyTier: true,
                 totalVisits: true,
@@ -48,7 +36,7 @@ export async function GET(req: Request) {
             user.id,
             user.name,
             user.email,
-            user.isAdmin ? "Da" : "Ne",
+            user.role === "OWNER" || user.role === "ADMIN" ? "Da" : "Ne",
             user.loyaltyPoints.toString(),
             user.loyaltyTier,
             user.totalVisits.toString(),

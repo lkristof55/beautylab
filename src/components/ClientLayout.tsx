@@ -23,8 +23,24 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // Postavi globalne funkcije za otvaranje modala
   useEffect(() => {
     if (typeof window !== "undefined") {
-      (window as any).openLoginModal = () => setShowLoginModal(true);
-      (window as any).openRegisterModal = () => setShowRegisterModal(true);
+      (window as any).openLoginModal = () => {
+        // Spremi trenutnu scroll poziciju
+        const scrollY = window.scrollY;
+        setShowLoginModal(true);
+        // Vrati scroll poziciju nakon kratkog delay-a da se osiguramo da se modal otvorio
+        setTimeout(() => {
+          window.scrollTo(0, scrollY);
+        }, 0);
+      };
+      (window as any).openRegisterModal = () => {
+        // Spremi trenutnu scroll poziciju
+        const scrollY = window.scrollY;
+        setShowRegisterModal(true);
+        // Vrati scroll poziciju nakon kratkog delay-a
+        setTimeout(() => {
+          window.scrollTo(0, scrollY);
+        }, 0);
+      };
     }
 
     return () => {
@@ -54,10 +70,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         open={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={() => {
-          // Postavi flag da treba otvoriti booking modal nakon prijave
-          if (typeof window !== "undefined") {
-            (window as any).shouldOpenBookingAfterLogin = true;
-          }
+          // Redirect logika se rješava u LoginModal komponenti
+          // Ovdje ne postavljamo shouldOpenBookingAfterLogin jer to zavisi od clickedReserve flag-a
         }}
       />
 

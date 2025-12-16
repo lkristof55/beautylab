@@ -4,16 +4,16 @@ import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
 import { isValidEmail } from "@/lib/validation";
 
-// Tajni ključ — obavezno dodaj u .env datoteku
+// Tajni ključ, obavezno dodaj u .env datoteku
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
 export async function POST(req: Request) {
   try {
     // Provjeri da li je JWT_SECRET postavljen
     if (!JWT_SECRET) {
-      console.error("JWT_SECRET is not defined in environment variables");
+      console.error("JWT_SECRET nije definiran u environment varijablama");
       return NextResponse.json(
-        { error: "Server configuration error" },
+        { error: "Greška konfiguracije servera" },
         { status: 500 }
       );
     }
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         id: user.id,
         name: user.name,
         email: user.email,
-        isAdmin: user.isAdmin,
+        role: user.role,
       },
     });
   } catch (error) {

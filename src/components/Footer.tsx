@@ -1,27 +1,46 @@
 ﻿"use client";
 
 import React from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 import "../app/globals.css";
 
 export default function Footer() {
+    const { user } = useAuth();
+    const router = useRouter();
+
+    const handleReserveClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        if (!user) {
+            // Ako nije prijavljen, postavi flag i otvori login modal
+            if (typeof window !== "undefined") {
+                sessionStorage.setItem("clickedReserve", "true");
+                if ((window as any).openLoginModal) {
+                    (window as any).openLoginModal();
+                }
+            }
+        } else {
+            // Ako je prijavljen, idi na dashboard
+            router.push("/dashboard");
+        }
+    };
     return (
         <footer id="footer" className="footer">
             <div className="footer__container">
                 <div className="footer__brand">
                     <h3 className="footer__brand-title">Beauty Lab by Irena</h3>
                     <p className="footer__brand-tagline">
-                        Your new favorite appointment — in 3 clicks.
+                        Tvoj novi omiljeni termin, u 3 klika.
                     </p>
                     <p className="footer__brand-description">
-                        Experience luxury beauty services in an elegant, intimate setting.
-                        We specialize in manicure, pedicure, waxing, and brows & lashes
-                        treatments.
+                        Doživi luksuzne usluge ljepote u elegantnom, intimnom okruženju.
+                        Specijalizirane smo za manikuru, pedikuru i depilaciju.
                     </p>
                 </div>
 
                 <div className="footer__info-grid">
                     <div className="footer__info-block">
-                        <h4 className="footer__info-title">Contact</h4>
+                        <h4 className="footer__info-title">Kontakt</h4>
                         <ul className="footer__info-list">
                             <li>
                                 📞 +1 (234) 567-890
@@ -36,31 +55,30 @@ export default function Footer() {
                     </div>
 
                     <div className="footer__info-block">
-                        <h4 className="footer__info-title">Hours</h4>
+                        <h4 className="footer__info-title">Radno Vrijeme</h4>
                         <ul className="footer__info-list">
-                            <li>Monday - Friday: 9:00 AM - 7:00 PM</li>
-                            <li>Saturday: 10:00 AM - 6:00 PM</li>
-                            <li>Sunday: Closed</li>
+                            <li>Ponedjeljak - Petak: 9:00 - 19:00</li>
+                            <li>Subota: 10:00 - 18:00</li>
+                            <li>Nedjelja: Zatvoreno</li>
                         </ul>
                     </div>
 
                     <div className="footer__info-block">
-                        <h4 className="footer__info-title">Services</h4>
+                        <h4 className="footer__info-title">Usluge</h4>
                         <ul className="footer__info-list">
-                            <li>Manicure</li>
-                            <li>Pedicure</li>
-                            <li>Waxing</li>
-                            <li>Brows & Lashes</li>
+                            <li>Manikura</li>
+                            <li>Pedikura</li>
+                            <li>Depilacija</li>
                         </ul>
                     </div>
 
                     <div className="footer__info-block">
-                        <h4 className="footer__info-title">Quick Links</h4>
+                        <h4 className="footer__info-title">Brzi Linkovi</h4>
                         <ul className="footer__info-list">
-                            <li><a href="/">Home</a></li>
-                            <li><a href="/dashboard">Book Appointment</a></li>
-                            <li><a href="/radovi">Our Work</a></li>
-                            <li><a href="/about">About Us</a></li>
+                            <li><a href="/">Početna</a></li>
+                            <li><a href="/dashboard" onClick={handleReserveClick}>Rezerviraj Termin</a></li>
+                            <li><a href="/radovi">Naš Rad</a></li>
+                            <li><a href="/about">O Nama</a></li>
                         </ul>
                     </div>
                 </div>
@@ -69,7 +87,7 @@ export default function Footer() {
 
                 <div className="footer__bottom">
                     <div className="footer__social">
-                        <span className="footer__social-label">Follow us</span>
+                        <span className="footer__social-label">Prati nas</span>
                         <div className="footer__social-links">
                             <a
                                 href="https://instagram.com"
@@ -91,11 +109,11 @@ export default function Footer() {
                     </div>
 
                     <div className="footer__copyright">
-                        <p>© 2025 Beauty Lab by Irena. All rights reserved.</p>
+                        <p>© 2025 Beauty Lab by Irena. Sva prava pridržana.</p>
                         <div className="footer__legal-links">
-                            <a href="/privacy">Privacy Policy</a>
+                            <a href="/privacy">Pravila Privatnosti</a>
                             <span>|</span>
-                            <a href="/terms">Terms of Service</a>
+                            <a href="/terms">Uvjeti Korištenja</a>
                         </div>
                     </div>
                 </div>

@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
+import { checkOwnerOrAdmin } from "@/lib/auth";
 
 // GET - dohvati sve korisnike s loyalty podacima
 export async function GET(req: Request) {
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-
-        // Provjeri da li je admin
-        const adminUser = await prisma.user.findUnique({ where: { id: decoded.userId } });
-        if (!adminUser || (!adminUser.isAdmin && adminUser.email !== "irena@beautylab.hr")) {
-            return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+        const authCheck = await checkOwnerOrAdmin(token);
+        if (!authCheck) {
+            return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
         }
 
         const users = await prisma.user.findMany({
@@ -37,7 +32,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ users });
     } catch (error) {
         console.error("GET /admin/loyalty error:", error);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
     }
 }
 
@@ -46,28 +41,25 @@ export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-
-        // Provjeri da li je admin
-        const adminUser = await prisma.user.findUnique({ where: { id: decoded.userId } });
-        if (!adminUser || (!adminUser.isAdmin && adminUser.email !== "irena@beautylab.hr")) {
-            return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+        const authCheck = await checkOwnerOrAdmin(token);
+        if (!authCheck) {
+            return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
         }
 
         const { userId, points, description, type = "admin_adjust" } = await req.json();
 
         if (!userId || points === undefined) {
-            return NextResponse.json({ error: "User ID and points required" }, { status: 400 });
+            return NextResponse.json({ error: "ID korisnika i bodovi su obavezni" }, { status: 400 });
         }
 
         // Ažuriraj bodove korisnika
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
+            return NextResponse.json({ error: "Korisnik nije pronađen" }, { status: 404 });
         }
 
         const updatedUser = await prisma.user.update({
@@ -107,7 +99,7 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error("POST /admin/loyalty error:", error);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
     }
 }
 

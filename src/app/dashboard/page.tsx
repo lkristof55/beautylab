@@ -18,6 +18,7 @@ import SettingsModal from "@/components/SettingsModal";
 import { toast } from "@/components/Toast";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { SERVICES_CONFIG, SERVICES } from "@/lib/services";
 
 
 type Appointment = {
@@ -27,6 +28,8 @@ type Appointment = {
     status?: string;
     userId?: string;
     user?: { name: string; email: string };
+    assignedEmployee?: { id: string; name: string; email: string } | null;
+    assignedEmployeeId?: string | null;
     duration?: number;
     isCompleted?: boolean;
     pointsEarned?: number;
@@ -53,7 +56,8 @@ interface ServiceCount {
 }
 
 export default function DashboardPage() {
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [userRole, setUserRole] = useState<string | null>(null);
+    const [isUserAdmin, setIsUserAdmin] = useState(false);
     const [activeTab, setActiveTab] = useState("appointments");
     const [adminTab, setAdminTab] = useState("calendar");
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -104,19 +108,8 @@ export default function DashboardPage() {
     // Invite codes state
     const [inviteCodes, setInviteCodes] = useState<any[]>([]);
     const [inviteCodesLoading, setInviteCodesLoading] = useState(false);
-
-    const SERVICES_CONFIG = {
-        "Manikura": { duration: 45, price: 35 },
-        "Gel nokti": { duration: 90, price: 55 },
-        "Pedikura": { duration: 60, price: 45 },
-        "Depilacija - noge": { duration: 45, price: 40 },
-        "Depilacija - bikini": { duration: 30, price: 30 },
-        "Masaža": { duration: 60, price: 60 },
-        "Trepavice": { duration: 90, price: 80 },
-        "Obrve": { duration: 30, price: 25 }
-    };
-
-    const SERVICES = Object.keys(SERVICES_CONFIG);
+    const [generatingInviteCode, setGeneratingInviteCode] = useState(false);
+    const [deletingInviteCode, setDeletingInviteCode] = useState<string | null>(null);
 
     useEffect(() => {
         const loadDashboard = async () => {
@@ -130,10 +123,11 @@ export default function DashboardPage() {
 
             const parsedUser = JSON.parse(userData);
 
-            // Check if admin
-            const adminEmail = 'irena@beautylab.hr';
-            const isUserAdmin = parsedUser.email === adminEmail || parsedUser.isAdmin;
-            setIsAdmin(isUserAdmin);
+            // Check if admin based on role
+            const userRoleValue = parsedUser.role || 'CLIENT';
+            setUserRole(userRoleValue);
+            const isAdminUser = userRoleValue === 'OWNER' || userRoleValue === 'ADMIN' || userRoleValue === 'MODERATOR';
+            setIsUserAdmin(isAdminUser);
 
             try {
                 if (isUserAdmin) {
@@ -159,19 +153,20 @@ export default function DashboardPage() {
         };
 
         loadDashboard();
-    }, [router]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Pokreni samo jednom pri mount-u
 
 
     // Osvježi notifikacije svakih 30 sekundi (samo za admina)
     useEffect(() => {
-        if (!isAdmin || loading) return;
+        if (!isUserAdmin || loading) return;
 
         const interval = setInterval(() => {
             fetchNotifications();
         }, 30000);
 
         return () => clearInterval(interval);
-    }, [isAdmin, loading]);
+    }, [isUserAdmin, loading]);
 
     // Fetch notifications
     const fetchNotifications = async () => {
@@ -527,6 +522,8 @@ export default function DashboardPage() {
     };
 
     const generateInviteCode = async () => {
+        if (generatingInviteCode) return;
+        setGeneratingInviteCode(true);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('/api/admin/invite-codes', {
@@ -539,21 +536,26 @@ export default function DashboardPage() {
 
             if (res.ok) {
                 await fetchInviteCodes();
+                toast.success('Invite kod uspješno generiran');
             } else {
                 const error = await res.json();
-                alert(error.error || 'Greška pri generiranju invite koda');
+                toast.error(error.error || 'Greška pri generiranju invite koda');
             }
         } catch (err) {
             console.error('Error generating invite code:', err);
-            alert('Greška pri generiranju invite koda');
+            toast.error('Greška pri generiranju invite koda');
+        } finally {
+            setGeneratingInviteCode(false);
         }
     };
 
     const deleteInviteCode = async (id: string) => {
-        if (!confirm('Jeste li sigurni da želite obrisati ovaj invite code?')) {
+        if (!window.confirm('Jeste li sigurni da želite obrisati ovaj invite code?')) {
             return;
         }
 
+        if (deletingInviteCode === id) return;
+        setDeletingInviteCode(id);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch(`/api/admin/invite-codes?id=${id}`, {
@@ -563,19 +565,22 @@ export default function DashboardPage() {
 
             if (res.ok) {
                 await fetchInviteCodes();
+                toast.success('Invite kod uspješno obrisan');
             } else {
                 const error = await res.json();
-                alert(error.error || 'Greška pri brisanju invite koda');
+                toast.error(error.error || 'Greška pri brisanju invite koda');
             }
         } catch (err) {
             console.error('Error deleting invite code:', err);
-            alert('Greška pri brisanju invite koda');
+            toast.error('Greška pri brisanju invite koda');
+        } finally {
+            setDeletingInviteCode(null);
         }
     };
 
     const copyInviteCode = (code: string) => {
         navigator.clipboard.writeText(code);
-        alert('Invite code kopiran!');
+        toast.success('Invite code kopiran!');
     };
 
     // User functions
@@ -626,7 +631,11 @@ export default function DashboardPage() {
         }
     };
 
+    const [generatingUserInviteCode, setGeneratingUserInviteCode] = useState(false);
+    
     const generateUserInviteCode = async () => {
+        if (generatingUserInviteCode) return;
+        setGeneratingUserInviteCode(true);
         try {
             const token = localStorage.getItem("token");
             const res = await fetch("/api/invite-codes/generate", {
@@ -642,13 +651,16 @@ export default function DashboardPage() {
                 setInviteCode(data.inviteCode.code);
                 // Osvježi invite kodove
                 await fetchUserInviteCode();
+                toast.success("Invite kod uspješno generiran");
             } else {
                 const errorData = await res.json();
-                alert(errorData.error || "Greška pri generiranju invite koda");
+                toast.error(errorData.error || "Greška pri generiranju invite koda");
             }
         } catch (error) {
             console.error("Error generating invite code:", error);
-            alert("Greška pri generiranju invite koda");
+            toast.error("Greška pri generiranju invite koda");
+        } finally {
+            setGeneratingUserInviteCode(false);
         }
     };
 
@@ -741,7 +753,7 @@ export default function DashboardPage() {
 
         return {
             id: apt.id,
-            title: `${apt.service} – ${userName}${isCompleted ? " ✅" : ""}`,
+            title: `${apt.service} – ${userName}${apt.assignedEmployee ? ` (${apt.assignedEmployee.name})` : ""}${isCompleted ? " ✅" : ""}`,
             start,
             end,
             backgroundColor: isCompleted ? "#10b981" : "#e07e9e",
@@ -762,7 +774,7 @@ export default function DashboardPage() {
     }
 
     // ADMIN DASHBOARD
-    if (isAdmin) {
+    if (isUserAdmin) {
         return (
             <div style={{
                 display: 'flex',
@@ -918,6 +930,54 @@ export default function DashboardPage() {
                                     <span style={{ fontWeight: '500' }}>Invite Kodovi</span>
                                 </button>
                             </li>
+                            <li>
+                                <button
+                                    onClick={() => setAdminTab('employees')}
+                                    className={`tab-button ${adminTab === 'employees' ? 'active' : ''}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '1rem',
+                                        padding: '0.875rem 1rem',
+                                        borderRadius: '0.75rem',
+                                        transition: 'all 0.3s',
+                                        width: '100%',
+                                        justifyContent: 'flex-start',
+                                        background: adminTab === 'employees' ? 'var(--rose)' : 'transparent',
+                                        color: adminTab === 'employees' ? 'white' : 'var(--graphite)',
+                                        border: 'none',
+                                        fontSize: '1rem',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <span style={{ fontSize: '1.25rem' }}>👥</span>
+                                    <span style={{ fontWeight: '500' }}>Zaposlenici</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => setAdminTab('cash-register')}
+                                    className={`tab-button ${adminTab === 'cash-register' ? 'active' : ''}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '1rem',
+                                        padding: '0.875rem 1rem',
+                                        borderRadius: '0.75rem',
+                                        transition: 'all 0.3s',
+                                        width: '100%',
+                                        justifyContent: 'flex-start',
+                                        background: adminTab === 'cash-register' ? 'var(--rose)' : 'transparent',
+                                        color: adminTab === 'cash-register' ? 'white' : 'var(--graphite)',
+                                        border: 'none',
+                                        fontSize: '1rem',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <span style={{ fontSize: '1.25rem' }}>💰</span>
+                                    <span style={{ fontWeight: '500' }}>Blagajna</span>
+                                </button>
+                            </li>
                         </ul>
 
                         <div style={{
@@ -1030,6 +1090,8 @@ export default function DashboardPage() {
                                     {adminTab === 'stats' && '📊 Statistika i analitika'}
                                     {adminTab === 'loyalty' && '⭐ Loyalty program'}
                                     {adminTab === 'invite-codes' && '🎫 Upravljanje Invite Kodovima'}
+                                    {adminTab === 'employees' && '👥 Upravljanje zaposlenicima'}
+                                    {adminTab === 'cash-register' && '💰 Blagajna'}
                                 </h1>
                                 <p style={{
                                     margin: 0,
@@ -1312,16 +1374,40 @@ export default function DashboardPage() {
                                             toast.error("Greška pri označavanju termina");
                                         }
                                     }}
-                                    onUpdate={async (appointmentId: string, date: string, service: string) => {
+                                    onUncomplete={async (appointmentId: string) => {
                                         try {
                                             const token = localStorage.getItem("token");
-                                            const res = await fetch("/api/admin/appointments", {
+                                            const res = await fetch("/api/admin/appointments/complete", {
                                                 method: "PUT",
                                                 headers: {
                                                     "Content-Type": "application/json",
                                                     Authorization: `Bearer ${token}`,
                                                 },
-                                                body: JSON.stringify({ appointmentId, date, service }),
+                                                body: JSON.stringify({ appointmentId }),
+                                            });
+
+                                            if (res.ok) {
+                                                const data = await res.json();
+                                                toast.success(`Termin označen kao neizvršen. Oduzeto ${data.pointsRemoved} bodova.`);
+                                                fetchAdminAppointments();
+                                            } else {
+                                                const errorData = await res.json();
+                                                toast.error(errorData.error || "Greška pri označavanju termina");
+                                            }
+                                        } catch (error) {
+                                            toast.error("Greška pri označavanju termina");
+                                        }
+                                    }}
+                                    onUpdate={async (appointmentId: string, date: string, service: string, assignedEmployeeId?: string) => {
+                                        try {
+                                            const token = localStorage.getItem("token");
+                                            const res = await fetch("/api/admin/appointments/update", {
+                                                method: "PUT",
+                                                headers: {
+                                                    "Content-Type": "application/json",
+                                                    Authorization: `Bearer ${token}`,
+                                                },
+                                                body: JSON.stringify({ appointmentId, date, service, assignedEmployeeId }),
                                             });
 
                                             if (res.ok) {
@@ -1779,12 +1865,12 @@ export default function DashboardPage() {
                                                         });
                                                         if (res.ok) {
                                                             await fetchInviteCodes();
-                                                            alert('Svi invite kodovi su obrisani');
+                                                            toast.success('Svi invite kodovi su obrisani');
                                                         } else {
-                                                            alert('Greška pri brisanju kodova');
+                                                            toast.error('Greška pri brisanju kodova');
                                                         }
                                                     } catch (error) {
-                                                        alert('Greška pri brisanju kodova');
+                                                        toast.error('Greška pri brisanju kodova');
                                                     }
                                                 }
                                             }}
@@ -1800,9 +1886,10 @@ export default function DashboardPage() {
                                         <button
                                             onClick={generateInviteCode}
                                             className="btn btn-primary"
+                                            disabled={generatingInviteCode}
                                             style={{ minWidth: '180px' }}
                                         >
-                                            + Generiraj novi kod
+                                            {generatingInviteCode ? '⏳ Generiranje...' : '+ Generiraj novi kod'}
                                         </button>
                                     </div>
                                 </div>
@@ -2003,13 +2090,16 @@ export default function DashboardPage() {
                                                                     <button
                                                                         onClick={() => deleteInviteCode(code.id)}
                                                                         className="btn btn-outline btn-sm"
+                                                                        disabled={deletingInviteCode === code.id}
                                                                         style={{
                                                                             minWidth: 'auto',
-                                                                            color: '#dc2626',
-                                                            borderColor: '#dc2626'
+                                                                            color: deletingInviteCode === code.id ? '#999' : '#dc2626',
+                                                            borderColor: deletingInviteCode === code.id ? '#999' : '#dc2626',
+                                                                            opacity: deletingInviteCode === code.id ? 0.6 : 1,
+                                                                            cursor: deletingInviteCode === code.id ? 'not-allowed' : 'pointer'
                                                                         }}
                                                                     >
-                                                                        Obriši
+                                                                        {deletingInviteCode === code.id ? '⏳' : 'Obriši'}
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -2408,8 +2498,9 @@ export default function DashboardPage() {
                                                 <button
                                                     className="btn btn-primary"
                                                     onClick={generateUserInviteCode}
+                                                    disabled={generatingUserInviteCode}
                                                 >
-                                                    ➕ Generiraj invite code
+                                                    {generatingUserInviteCode ? '⏳ Generiranje...' : '➕ Generiraj invite code'}
                                                 </button>
                                             </div>
                                         )}

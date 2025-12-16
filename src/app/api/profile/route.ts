@@ -8,6 +8,14 @@ const JWT_SECRET = process.env.JWT_SECRET as string;
 
 // GET - dohvati profil korisnika
 export async function GET(req: Request) {
+  if (!JWT_SECRET) {
+    console.error("JWT_SECRET nije definiran u environment varijablama");
+    return NextResponse.json(
+      { error: "Greška konfiguracije servera" },
+      { status: 500 }
+    );
+  }
+
   const authHeader = req.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
@@ -46,6 +54,14 @@ export async function GET(req: Request) {
 
 // PUT - ažuriraj profil korisnika
 export async function PUT(req: Request) {
+  if (!JWT_SECRET) {
+    console.error("JWT_SECRET nije definiran u environment varijablama");
+    return NextResponse.json(
+      { error: "Greška konfiguracije servera" },
+      { status: 500 }
+    );
+  }
+
   const authHeader = req.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
@@ -123,6 +139,14 @@ export async function PUT(req: Request) {
 
 // PATCH - promijeni lozinku
 export async function PATCH(req: Request) {
+  if (!JWT_SECRET) {
+    console.error("JWT_SECRET nije definiran u environment varijablama");
+    return NextResponse.json(
+      { error: "Greška konfiguracije servera" },
+      { status: 500 }
+    );
+  }
+
   const authHeader = req.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });

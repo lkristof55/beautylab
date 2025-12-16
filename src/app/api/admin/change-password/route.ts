@@ -1,32 +1,20 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { validatePassword } from "@/lib/validation";
-
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
-async function checkAdmin(token: string) {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
-    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-    const adminEmail = "irena@beautylab.hr";
-    if (!user || (!user.isAdmin && user.email !== adminEmail)) {
-        return null;
-    }
-    return { decoded, user };
-}
+import { checkOwnerOrAdmin } from "@/lib/auth";
 
 export async function PUT(req: Request) {
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
         }
 
         const token = authHeader.split(" ")[1];
-        const adminCheck = await checkAdmin(token);
+        const adminCheck = await checkOwnerOrAdmin(token);
         if (!adminCheck) {
-            return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+            return NextResponse.json({ error: "Nemate dozvolu za ovu akciju" }, { status: 403 });
         }
 
         const { currentPassword, newPassword } = await req.json();
@@ -39,7 +27,11 @@ export async function PUT(req: Request) {
         }
 
         // Provjeri trenutnu lozinku
-        const isValid = await bcrypt.compare(currentPassword, adminCheck.user.password);
+        const user = await prisma.user.findUnique({ where: { id: adminCheck.user.id } });
+        if (!user) {
+            return NextResponse.json({ error: "Korisnik nije pronađen" }, { status: 404 });
+        }
+        const isValid = await bcrypt.compare(currentPassword, user.password);
         if (!isValid) {
             return NextResponse.json(
                 { error: "Trenutna lozinka nije ispravna" },
@@ -59,7 +51,7 @@ export async function PUT(req: Request) {
         // Hashiraj i spremi novu lozinku
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         await prisma.user.update({
-            where: { id: adminCheck.user.id },
+            where: { id: user.id },
             data: { password: hashedPassword }
         });
 

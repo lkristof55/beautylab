@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginModal({
@@ -17,6 +18,7 @@ export default function LoginModal({
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
+    const router = useRouter();
 
     // Custom validacijske poruke za HTML5 validaciju
     const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,21 +67,25 @@ export default function LoginModal({
                 login(data.user, data.token);
                 setMessage("✅ Prijava uspješna!");
                 
-                // Postavi flag da treba otvoriti booking modal nakon prijave (ako je korisnik kliknuo "Rezerviraj termin")
-                if (typeof window !== "undefined" && (window as any).shouldOpenBookingAfterLogin === undefined) {
-                    // Provjeri je li korisnik kliknuo "Rezerviraj termin" prije prijave
-                    const clickedReserve = sessionStorage.getItem("clickedReserve");
-                    if (clickedReserve) {
-                        (window as any).shouldOpenBookingAfterLogin = true;
-                        sessionStorage.removeItem("clickedReserve");
-                    }
-                }
+                // Provjeri je li korisnik kliknuo "Rezerviraj termin" prije prijave
+                const clickedReserve = sessionStorage.getItem("clickedReserve");
                 
-                // Zatvori modal i pozovi callback
                 setTimeout(() => {
-                    onClose();
-                    if (onLoginSuccess) {
-                        onLoginSuccess();
+                    if (clickedReserve) {
+                        // Korisnik je kliknuo "Rezerviraj termin" - postavi flag da se otvori booking modal
+                        if (typeof window !== "undefined") {
+                            (window as any).shouldOpenBookingAfterLogin = true;
+                        }
+                        sessionStorage.removeItem("clickedReserve");
+                        // Zatvori modal i ostani na stranici - booking modal će se otvoriti
+                        onClose();
+                        if (onLoginSuccess) {
+                            onLoginSuccess();
+                        }
+                    } else {
+                        // Korisnik nije kliknuo "Rezerviraj termin" - redirect na dashboard
+                        onClose();
+                        router.push("/dashboard");
                     }
                 }, 500);
             } else {

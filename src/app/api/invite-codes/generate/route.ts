@@ -8,9 +8,17 @@ const JWT_SECRET = process.env.JWT_SECRET as string;
 // POST - generiraj novi invite code za usera
 export async function POST(req: Request) {
   try {
+    if (!JWT_SECRET) {
+      console.error("JWT_SECRET nije definiran u environment varijablama");
+      return NextResponse.json(
+        { error: "Greška konfiguracije servera" },
+        { status: 500 }
+      );
+    }
+
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Neautoriziran pristup" }, { status: 401 });
     }
 
     const token = authHeader.split(" ")[1];
@@ -21,7 +29,7 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Korisnik nije pronađen" }, { status: 404 });
     }
 
     // Generiraj kod na osnovu imena korisnika (IME-XXXX)
@@ -65,9 +73,9 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("POST user invite code error:", error);
     if (error instanceof jwt.JsonWebTokenError) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      return NextResponse.json({ error: "Nevažeći token" }, { status: 401 });
     }
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Greška na serveru" }, { status: 500 });
   }
 }
 

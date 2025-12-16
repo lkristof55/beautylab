@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "./Toast";
 import EditAppointmentForm from "./EditAppointmentForm";
 
@@ -9,6 +9,8 @@ interface Appointment {
     service: string;
     date: string;
     user?: { name: string; email: string };
+    assignedEmployee?: { id: string; name: string; email: string } | null;
+    assignedEmployeeId?: string | null;
     isCompleted?: boolean;
     pointsEarned?: number;
     unregisteredName?: string | null;
@@ -23,9 +25,17 @@ interface DayAppointmentsModalProps {
     onAppointmentClick?: (appointment: Appointment) => void;
     onCreateNew?: (date: Date) => void;
     onComplete?: (appointmentId: string) => Promise<void>;
-    onUpdate?: (appointmentId: string, date: string, service: string) => Promise<void>;
+    onUncomplete?: (appointmentId: string) => Promise<void>;
+    onUpdate?: (appointmentId: string, date: string, service: string, assignedEmployeeId?: string) => Promise<void>;
     onDelete?: (appointmentId: string) => Promise<void>;
     onRefresh?: () => void;
+}
+
+interface Employee {
+    id: string;
+    name: string;
+    email: string;
+    isActive: boolean;
 }
 
 export default function DayAppointmentsModal({
@@ -36,6 +46,7 @@ export default function DayAppointmentsModal({
     onAppointmentClick,
     onCreateNew,
     onComplete,
+    onUncomplete,
     onUpdate,
     onDelete,
     onRefresh,
@@ -43,6 +54,31 @@ export default function DayAppointmentsModal({
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [editingAppointment, setEditingAppointment] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(false);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+
+    useEffect(() => {
+        if (open && onUpdate) {
+            fetchEmployees();
+        }
+    }, [open, onUpdate]);
+
+    const fetchEmployees = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            const res = await fetch("/api/admin/employees", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setEmployees(data.employees || []);
+            }
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+        }
+    };
 
     if (!open || !date) return null;
 
@@ -69,9 +105,9 @@ export default function DayAppointmentsModal({
         if (onRefresh) onRefresh();
     };
 
-    const handleUpdate = async (date: string, service: string) => {
+    const handleUpdate = async (date: string, service: string, assignedEmployeeId?: string) => {
         if (!selectedAppointment || !onUpdate) return;
-        await onUpdate(selectedAppointment.id, date, service);
+        await onUpdate(selectedAppointment.id, date, service, assignedEmployeeId);
         setEditingAppointment(false);
         setSelectedAppointment(null);
         if (onRefresh) onRefresh();
@@ -248,6 +284,11 @@ export default function DayAppointmentsModal({
                                             {appointment.user?.email && ` (${appointment.user.email})`}
                                             {(appointment as any).unregisteredPhone && ` (${(appointment as any).unregisteredPhone})`}
                                         </p>
+                                        {appointment.assignedEmployee && (
+                                            <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.875rem", color: "#059669", fontWeight: 500 }}>
+                                                👤 {appointment.assignedEmployee.name}
+                                            </p>
+                                        )}
                                                 {appointment.isCompleted && appointment.pointsEarned && (
                                                     <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.875rem", color: "#10b981", fontWeight: 500 }}>
                                                         💎 {appointment.pointsEarned} bodova
@@ -306,6 +347,9 @@ export default function DayAppointmentsModal({
                                     <p><strong>Usluga:</strong> {selectedAppointment.service}</p>
                                     <p><strong>Datum i vrijeme:</strong> {new Date(selectedAppointment.date).toLocaleString("hr-HR")}</p>
                                     <p><strong>Korisnik:</strong> {selectedAppointment.user?.name || "N/A"} ({selectedAppointment.user?.email || "N/A"})</p>
+                                    {selectedAppointment.assignedEmployee && (
+                                        <p><strong>Dodijeljeni zaposlenik:</strong> {selectedAppointment.assignedEmployee.name}</p>
+                                    )}
                                     <p><strong>Status:</strong> {selectedAppointment.isCompleted ? "✅ Završen" : "⏳ Na čekanju"}</p>
                                     {selectedAppointment.isCompleted && selectedAppointment.pointsEarned && (
                                         <p><strong>Dobiveni bodovi:</strong> {selectedAppointment.pointsEarned}</p>
@@ -320,6 +364,15 @@ export default function DayAppointmentsModal({
                                             style={{ width: "100%" }}
                                         >
                                             ✅ Označi kao završen
+                                        </button>
+                                    )}
+                                    {selectedAppointment.isCompleted && onUncomplete && (
+                                        <button
+                                            className="btn btn-outline"
+                                            onClick={handleUncomplete}
+                                            style={{ width: "100%", color: "#ef4444", borderColor: "#ef4444" }}
+                                        >
+                                            ❌ Označi kao neizvršen
                                         </button>
                                     )}
                                     {onUpdate && (
@@ -347,8 +400,9 @@ export default function DayAppointmentsModal({
                         {editingAppointment && selectedAppointment && onUpdate && (
                             <EditAppointmentForm
                                 appointment={selectedAppointment}
-                                onSave={(date, service) => {
-                                    handleUpdate(date, service);
+                                employees={employees}
+                                onSave={(date, service, assignedEmployeeId) => {
+                                    handleUpdate(date, service, assignedEmployeeId);
                                 }}
                                 onCancel={() => setEditingAppointment(false)}
                             />

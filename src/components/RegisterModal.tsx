@@ -231,7 +231,7 @@ export default function RegisterModal({
                     </div>
 
                     <div className="booking-field">
-                        <label className="booking-label">Invite Code</label>
+                        <label className="booking-label">Pozivni Kod</label>
                         <input
                             name="inviteCode"
                             placeholder="BEAUTY-XXXX"
